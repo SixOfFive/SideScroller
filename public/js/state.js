@@ -166,6 +166,10 @@ on('node', (m) => {
   n.dep = !!m.dep;
 });
 
+// Night re-randomization: nodes appear/disappear in unoccupied chunks.
+on('nadd', (m) => state.nodes.set(m.n.id, m.n));
+on('nrem', (m) => state.nodes.delete(m.id));
+
 // Stamp arrival time of fuel values so the HUD can run a local countdown.
 function stampFuel(s) {
   if (s.fuelS !== undefined) s.fuelAt = performance.now();

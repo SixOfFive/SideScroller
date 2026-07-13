@@ -57,6 +57,35 @@ function spawnDinoInRegion(idx) {
   return null;
 }
 
+// Remove wild (untamed) dinos whose center falls in [x0, x1).
+export function removeWildDinosIn(x0, x1) {
+  for (const [id, d] of world.dinos) {
+    if (d.owner || d.rider) continue;
+    const c = dinoCenter(d);
+    if (c >= x0 && c < x1) world.dinos.delete(id);
+  }
+}
+
+// Spawn `count` wild dinos within [x0, x1) using the region-at-center table.
+export function spawnDinosInSpan(x0, x1, count) {
+  const region = REGIONS[regionOf((x0 + x1) / 2)];
+  if (!region.dinos.length) return;
+  for (let k = 0; k < count; k++) {
+    const sp = pickWeighted(region.dinos);
+    const def = DINODEFS[sp];
+    const x = x0 + 80 + Math.random() * Math.max(1, x1 - x0 - 160);
+    const id = newId('d');
+    world.dinos.set(id, {
+      id, sp,
+      x, y: groundAt(x + def.w / 2) - def.h, vy: 0,
+      face: Math.random() < 0.5 ? -1 : 1,
+      state: 'idle', stateT: 1 + Math.random() * 3, targetX: x,
+      hp: def.hp, tame: 0, owner: null, name: def.name,
+      lastFedAt: 0, fleeFrom: 0, eggAt: 0, lastBite: 0, rider: null,
+    });
+  }
+}
+
 let spawnAcc = SPAWN_CHECK_S;
 
 function maybeSpawn(dt) {

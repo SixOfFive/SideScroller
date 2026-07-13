@@ -9,6 +9,7 @@ import {
 import { groundAt } from '../shared/terrain.js';
 import { send, sendStats, broadcast, wirePlayer } from './net.js';
 import { updateDinos, wireDinos } from './dinos.js';
+import { rollUnoccupiedChunks } from './chunks.js';
 
 let tickCount = 0;
 
@@ -39,6 +40,14 @@ function step() {
   world.time += dt;
 
   const settings = world.settings;
+
+  // Nightfall: re-roll unoccupied chunks once per night.
+  const phase = (world.time % settings.dayLen) / settings.dayLen;
+  if (phase >= 0.70 && phase < 0.92) {
+    if (!world.rolledNight) { world.rolledNight = true; rollUnoccupiedChunks(); }
+  } else if (phase < 0.55) {
+    world.rolledNight = false;
+  }
   for (const p of world.players.values()) {
     if (settings.hunger) p.hunger = Math.max(0, p.hunger - HUNGER_DRAIN_PS * dt);
     if (settings.hunger && p.hunger <= 0) {

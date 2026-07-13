@@ -14,6 +14,7 @@ export const world = {
   profiles: Object.create(null),
   time: 60,              // world clock in seconds (day cycle uses modulo)
   nextId: 1,
+  rolledNight: false,    // transient: has this night's chunk re-roll fired yet
   // World-wide rules, adjustable from the ESC options menu.
   settings: { hunger: true, thirst: true, damage: true, dayLen: 480 },
 };
