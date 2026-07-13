@@ -150,6 +150,8 @@ function updateHover() {
   state.hoverNode = best;
 }
 
+window.__game = { state, sendMsg }; // debug/testing handle
+
 let last = performance.now();
 function frame(now) {
   const dt = Math.min((now - last) / 1000, 0.05);

@@ -16,7 +16,7 @@ const YIELDS = {
     spear: { dmg: 5,  rolls: [['thatch', 1, 1, 1]] },
   },
   rock: {
-    hand:  { dmg: 5,  rolls: [['stone', 1, 1, 1]] },
+    hand:  { dmg: 5,  rolls: [['stone', 1, 1, 1], ['flint', 1, 1, 0.3]] },
     pick:  { dmg: 20, rolls: [['stone', 2, 3, 1], ['flint', 1, 1, 0.4]] },
     axe:   { dmg: 10, rolls: [['stone', 1, 2, 1], ['flint', 1, 1, 0.2]] },
     spear: { dmg: 5,  rolls: [['stone', 1, 1, 1]] },

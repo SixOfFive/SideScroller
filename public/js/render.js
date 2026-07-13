@@ -21,6 +21,8 @@ function resize() {
   const dpr = window.devicePixelRatio || 1;
   canvas.width = Math.round(innerWidth * dpr);
   canvas.height = Math.round(innerHeight * dpr);
+  canvas.style.width = innerWidth + 'px';
+  canvas.style.height = innerHeight + 'px';
   cam.dpr = dpr;
 }
 
