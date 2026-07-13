@@ -1,0 +1,73 @@
+// Message routing plus the small handlers (movement, equip, eat, chat, craft).
+// Bigger systems live in their own modules.
+
+import { ITEMS } from '../shared/items.js';
+import { RECIPES } from '../shared/recipes.js';
+import {
+  WORLD_W, GROUND_Y, PLAYER_W, PLAYER_H, CHAT_MAX, STATS_MAX,
+} from '../shared/const.js';
+import { toast, sendInv, sendStats, broadcast } from './net.js';
+import { invAdd, invRemove, invCount, invPayCost } from './inventory.js';
+import { harvest } from './harvest.js';
+import { build, demolish } from './building.js';
+import { use } from './interact.js';
+import { attack, feed, dinoCmd } from './dinos.js';
+
+const ANIMS = new Set(['idle', 'walk', 'jump', 'swing']);
+const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
+
+const HANDLERS = {
+  input(p, m) {
+    const x = Number(m.x), y = Number(m.y);
+    if (Number.isFinite(x)) p.x = clamp(x, 0, WORLD_W - PLAYER_W);
+    if (Number.isFinite(y)) p.y = clamp(y, -1200, GROUND_Y - PLAYER_H);
+    p.vx = clamp(Number(m.vx) || 0, -500, 500);
+    p.face = m.f === -1 ? -1 : 1;
+    p.anim = ANIMS.has(m.a) ? m.a : 'idle';
+  },
+
+  equip(p, m) {
+    const item = typeof m.item === 'string' ? m.item : '';
+    if (item === '') { p.equip = ''; sendInv(p); return; }
+    if (ITEMS[item] && ITEMS[item].tool && invCount(p.inv, item) > 0) {
+      p.equip = item;
+      sendInv(p);
+    }
+  },
+
+  eat(p, m) {
+    const def = ITEMS[m.item];
+    if (!def || !def.food) return;
+    if (!invRemove(p.inv, m.item, 1)) { toast(p, 'None left'); return; }
+    p.hunger = clamp(p.hunger + def.food.hunger, 0, STATS_MAX);
+    p.hp = clamp(p.hp + def.food.hp, 1, STATS_MAX); // food never kills outright
+    sendInv(p);
+    sendStats(p);
+  },
+
+  craft(p, m) {
+    const r = RECIPES[m.id];
+    if (!r || r.structure) return;
+    if (!invPayCost(p.inv, r.cost)) { toast(p, 'Not enough resources'); return; }
+    for (const [item, qty] of Object.entries(r.gives)) invAdd(p.inv, item, qty);
+    toast(p, `Crafted ${r.name}`);
+    sendInv(p);
+  },
+
+  chat(p, m) {
+    const text = String(m.text ?? '').slice(0, CHAT_MAX).trim();
+    if (text) broadcast({ t: 'chat', from: p.name, text });
+  },
+
+  harvest, build, demolish, use, attack, feed, dinoCmd,
+};
+
+export function route(p, msg) {
+  const h = HANDLERS[msg.t];
+  if (!h) return;
+  try {
+    h(p, msg);
+  } catch (e) {
+    console.error(`handler '${msg.t}' failed:`, e);
+  }
+}
