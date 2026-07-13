@@ -202,6 +202,16 @@ on('hurt', (m) => {
 on('mount', (m) => { state.me.mounted = true; state.me.mountId = m.dino; });
 on('dismount', () => { state.me.mounted = false; state.me.mountId = null; state.me.vy = 0; });
 
+on('tp', (m) => {
+  state.me.x = m.x;
+  state.me.y = m.y;
+  state.me.vx = 0;
+  state.me.vy = 0;
+  state.me.mounted = false;
+  state.me.mountId = null;
+  if (m.label) state.regionBanner = { text: m.label, at: performance.now() };
+});
+
 on('dead', (m) => {
   state.me.x = m.x;
   state.me.y = m.y;

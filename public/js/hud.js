@@ -7,6 +7,7 @@ import { worldTime } from './state.js';
 import { INTERACT_RANGE } from '/shared/const.js';
 import { DINODEFS } from '/shared/dinodefs.js';
 import { STRUCTURES } from '/shared/structures.js';
+import { regionAt } from '/shared/regions.js';
 
 const SLOTS = [
   { key: '1', item: '', label: 'Hands' },
@@ -98,6 +99,8 @@ function contextHint(ctx, W) {
     hint = 'Click to place · Q / Esc to stop building';
   } else {
     const bits = [];
+    const portal = findNearestStructure(INTERACT_RANGE, ['portal']);
+    if (portal) bits.push(`E enter ${portal.label} portal`);
     const s = findNearestStructure(INTERACT_RANGE + 30, ['campfire', 'storage_box']);
     if (s && s.kind === 'campfire') {
       const left = Math.max(0,
@@ -155,6 +158,38 @@ function hoverInfo(ctx, W) {
   ctx.fillText(label, W / 2, 31);
 }
 
+const DANGER_LABEL = ['safe', 'low danger', 'dangerous', 'deadly', 'lethal'];
+const DANGER_COLOR = ['#a7d8a0', '#e6d27a', '#e8a24e', '#e8663e', '#ff3b3b'];
+
+function regionInfo(ctx, W) {
+  const r = regionAt(state.me.x);
+  const d = r.danger || 0;
+  ctx.font = '700 13px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = 'rgba(8,11,20,0.5)';
+  ctx.fillText(`${r.name}`, W / 2 + 1, 25);
+  ctx.fillStyle = '#e6ecf6';
+  ctx.fillText(`${r.name}`, W / 2, 24);
+  ctx.font = '11px sans-serif';
+  ctx.fillStyle = DANGER_COLOR[d];
+  ctx.fillText(DANGER_LABEL[d], W / 2, 40);
+
+  // transient banner after a portal jump
+  const b = state.regionBanner;
+  if (b) {
+    const age = (performance.now() - b.at) / 1000;
+    if (age > 2.6) { state.regionBanner = null; return; }
+    const a = age < 0.3 ? age / 0.3 : age > 2 ? (2.6 - age) / 0.6 : 1;
+    ctx.globalAlpha = Math.max(0, Math.min(1, a));
+    ctx.font = '800 30px sans-serif';
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.fillText(b.text, W / 2 + 2, 120);
+    ctx.fillStyle = '#ffe9ad';
+    ctx.fillText(b.text, W / 2, 118);
+    ctx.globalAlpha = 1;
+  }
+}
+
 export function drawHud(ctx) {
   ctx.save();
   ctx.scale(cam.scale, cam.scale);
@@ -162,6 +197,7 @@ export function drawHud(ctx) {
   vitals(ctx);
   toolbelt(ctx, W);
   clock(ctx, W);
+  regionInfo(ctx, W);
   contextHint(ctx, W);
   hoverInfo(ctx, W);
   ctx.restore();

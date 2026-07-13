@@ -322,6 +322,58 @@ export function drawStructure(ctx, s, br, t, alpha = 1) {
     thatchPanel(ctx, s.x, s.y, 24, def.h, br, true);
     thatchPanel(ctx, s.x + def.w - 24, s.y, 24, def.h, br, true);
     thatchPanel(ctx, s.x + 20, s.y, def.w - 40, 20, br, false);
+  } else if (s.kind === 'forge') {
+    // stone furnace with a glowing mouth
+    ctx.fillStyle = shade(96, 96, 108, br);
+    ctx.fillRect(s.x, s.y + 8, def.w, def.h - 8);
+    ctx.fillStyle = shade(74, 74, 86, br);
+    ctx.fillRect(s.x + 4, s.y, def.w - 8, 12);
+    const lit = s.lit;
+    ctx.fillStyle = lit ? '#ff9a3c' : shade(40, 34, 34, br);
+    ctx.fillRect(s.x + def.w / 2 - 12, s.y + def.h - 26, 24, 18);
+    if (lit) {
+      const grd = ctx.createRadialGradient(s.x + def.w / 2, s.y + def.h - 17, 2, s.x + def.w / 2, s.y + def.h - 17, 40);
+      grd.addColorStop(0, 'rgba(255,150,50,0.5)'); grd.addColorStop(1, 'rgba(255,150,50,0)');
+      ctx.fillStyle = grd; ctx.fillRect(s.x - 20, s.y - 20, def.w + 40, def.h + 30);
+      ctx.fillStyle = 'rgba(90,70,80,0.5)';
+      for (let i = 0; i < 3; i++) {
+        const sy = s.y - 6 - ((t * 0.02 + i * 20 + s.x) % 40);
+        ctx.beginPath(); ctx.arc(s.x + def.w / 2 + Math.sin(sy * 0.1) * 6, sy, 4, 0, 7); ctx.fill();
+      }
+    }
+  } else if (s.kind === 'portal') {
+    const cx = s.x + def.w / 2, cy = s.y + def.h / 2;
+    const hue = s.hue ?? 200;
+    // stone frame
+    ctx.strokeStyle = shade(120, 122, 134, br);
+    ctx.lineWidth = 8;
+    ctx.beginPath(); ctx.ellipse(cx, cy, def.w / 2, def.h / 2, 0, 0, 7); ctx.stroke();
+    // swirling vortex
+    const glow = ctx.createRadialGradient(cx, cy, 4, cx, cy, def.w / 2);
+    glow.addColorStop(0, `hsla(${hue},80%,80%,0.95)`);
+    glow.addColorStop(0.6, `hsla(${hue},75%,55%,0.75)`);
+    glow.addColorStop(1, `hsla(${hue},70%,35%,0.35)`);
+    ctx.fillStyle = glow;
+    ctx.beginPath(); ctx.ellipse(cx, cy, def.w / 2 - 5, def.h / 2 - 5, 0, 0, 7); ctx.fill();
+    ctx.strokeStyle = `hsla(${hue},90%,85%,0.5)`;
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 3; i++) {
+      ctx.beginPath();
+      for (let a = 0; a < 6.3; a += 0.3) {
+        const rr = (a / 6.3) * (def.w / 2 - 8);
+        const ang = a * 2 + t * 0.003 + i * 2.1;
+        const px = cx + Math.cos(ang) * rr, py = cy + Math.sin(ang) * rr * (def.h / def.w);
+        if (a === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+    }
+    // label
+    ctx.font = '700 13px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillText(s.label || 'Portal', cx + 1, s.y - 7);
+    ctx.fillStyle = `hsl(${hue},85%,${55 + br * 25}%)`;
+    ctx.fillText(s.label || 'Portal', cx, s.y - 8);
   }
   ctx.restore();
 }

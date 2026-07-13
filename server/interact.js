@@ -3,7 +3,8 @@
 import { world } from './state.js';
 import { isItem } from '../shared/items.js';
 import { STRUCTURES } from '../shared/structures.js';
-import { INTERACT_RANGE, PLAYER_W } from '../shared/const.js';
+import { INTERACT_RANGE, PLAYER_W, PLAYER_H } from '../shared/const.js';
+import { groundAt } from '../shared/terrain.js';
 import { send, toast, sendInv, broadcast } from './net.js';
 import { invAdd, invRemove, invCount } from './inventory.js';
 
@@ -19,6 +20,20 @@ function inRange(p, s) {
 export function use(p, m) {
   const s = world.structures.get(m.id);
   if (!s || !inRange(p, s)) return;
+
+  if (s.kind === 'portal') {
+    const now = Date.now();
+    if (now - (p.lastTp || 0) < 1200) return; // no instant round-trips
+    p.lastTp = now;
+    const dx = Number(s.dest) || 0;
+    p.x = dx;
+    p.y = groundAt(dx + PLAYER_W / 2) - PLAYER_H;
+    p.vx = 0;
+    if (p.mount) { const mt = world.dinos.get(p.mount); if (mt) mt.rider = null; p.mount = null; send(p, { t: 'dismount' }); }
+    send(p, { t: 'tp', x: p.x, y: p.y, label: s.label });
+    broadcast({ t: 'fx', kind: 'poof', x: p.x + PLAYER_W / 2, y: p.y + PLAYER_H / 2 });
+    return;
+  }
 
   if (s.kind === 'campfire') {
     if (m.action === 'fuel') {

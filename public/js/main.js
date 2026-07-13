@@ -78,13 +78,18 @@ function toggleMount() {
 
 function doInteract() {
   const cx = meCenter();
-  const s = findNearestStructure(INTERACT_RANGE + 30, ['storage_box', 'campfire']);
+  // portals take priority when you're standing in one
+  const portal = findNearestStructure(INTERACT_RANGE, ['portal']);
+  if (portal) { sendMsg({ t: 'use', id: portal.id, action: 'enter' }); return; }
+
+  const s = findNearestStructure(INTERACT_RANGE + 30, ['storage_box', 'campfire', 'forge']);
   const d = findNearestDino(INTERACT_RANGE + 30, (dd) => !dd.o);
   const sD = s ? Math.abs(s.x + STRUCTURES[s.kind].w / 2 - cx) : Infinity;
   const dD = d ? Math.abs(d.x - cx) : Infinity;
   if (d && dD < sD) { sendMsg({ t: 'feed', dino: d.i }); return; }
   if (!s) return;
   if (s.kind === 'storage_box') openStorage(s.id);
+  else if (s.kind === 'forge') sendMsg({ t: 'use', id: s.id, action: 'smelt' });
   else sendMsg({ t: 'use', id: s.id, action: 'fuel' });
 }
 

@@ -60,6 +60,8 @@ function drawNight(br) {
 
   for (const s of state.structures.values()) {
     if (s.kind === 'campfire' && s.lit) lightHole(s.x + 32 - cam.x, s.y + 12, 300);
+    else if (s.kind === 'forge' && s.lit) lightHole(s.x + 36 - cam.x, s.y + 30, 200);
+    else if (s.kind === 'portal') lightHole(s.x + 37 - cam.x, s.y + 62, 210, 0.75);
   }
   lightHole(state.me.x + 14 - cam.x, state.me.y + 24, 140, 0.85);
   for (const p of state.players.values()) {

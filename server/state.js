@@ -62,7 +62,8 @@ export function saveWorld() {
     time: world.time,
     nextId: world.nextId,
     nodes: [...world.nodes.values()],
-    structures: [...world.structures.values()],
+    // portals are world fixtures rebuilt at boot; don't persist them
+    structures: [...world.structures.values()].filter((s) => s.kind !== 'portal'),
     dinos: [...world.dinos.values()],
     profiles: world.profiles,
     settings: world.settings,
