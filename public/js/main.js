@@ -6,7 +6,7 @@ import {
 } from './state.js';
 import { initInput, held, mouse, popActions } from './input.js';
 import { stepLocal } from './physics.js';
-import { screenToWorldX } from './camera.js';
+import { cam, screenToWorldX } from './camera.js';
 import { initRender, render } from './render.js';
 import {
   initUI, toast, toggleInv, toggleHelp, toggleBuildBar, cancelBuild,
@@ -151,7 +151,7 @@ function updateHover() {
   state.hoverNode = best;
 }
 
-window.__game = { state, sendMsg }; // debug/testing handle
+window.__game = { state, sendMsg, cam, screenToWorldX }; // debug/testing handle
 
 let last = performance.now();
 function frame(now) {
