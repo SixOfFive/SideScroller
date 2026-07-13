@@ -7,6 +7,7 @@ import { DINODEFS } from '../shared/dinodefs.js';
 import {
   WORLD_W, GROUND_Y, HARVEST_RANGE, INTERACT_RANGE, PLAYER_W,
 } from '../shared/const.js';
+import { groundAt } from '../shared/terrain.js';
 import { send, toast, sendInv, broadcast } from './net.js';
 import { invAdd, invRemove } from './inventory.js';
 import { swingReady, playerTool } from './harvest.js';
@@ -33,7 +34,7 @@ function spawnDino(sp) {
     if (!clear) continue;
     const d = {
       id: newId('d'), sp,
-      x, y: GROUND_Y - def.h, face: Math.random() < 0.5 ? -1 : 1,
+      x, y: groundAt(x + def.w / 2) - def.h, face: Math.random() < 0.5 ? -1 : 1,
       state: 'idle', stateT: 1 + Math.random() * 3, targetX: x,
       hp: def.hp, tame: 0, owner: null, name: def.name,
       lastFedAt: 0, fleeFrom: 0, eggAt: 0,
@@ -117,7 +118,7 @@ function stepDino(d, dt, now) {
   }
 
   d.x = Math.min(Math.max(d.x, 60), WORLD_W - 60 - def.w);
-  d.y = GROUND_Y - def.h;
+  d.y = groundAt(d.x + def.w / 2) - def.h;
 }
 
 export function updateDinos(dt, now) {

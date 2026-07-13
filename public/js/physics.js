@@ -3,12 +3,14 @@
 // trusts positions within bounds (co-op game, tribe honor system).
 
 import {
-  GRAVITY, MOVE_SPEED, JUMP_VEL, PLAYER_W, PLAYER_H, GROUND_Y,
+  GRAVITY, MOVE_SPEED, JUMP_VEL, PLAYER_W, PLAYER_H,
 } from '/shared/const.js';
 import { STRUCTURES } from '/shared/structures.js';
+import { groundTop, inWater } from '/shared/terrain.js';
 import { state } from './state.js';
 
 const MAX_FALL = 1400;
+const WATER_SLOW = 0.55;   // wading through a stream
 
 function colliders() {
   const solids = [], platforms = [];
@@ -24,8 +26,11 @@ function colliders() {
 export function stepLocal(me, dt, held) {
   const { solids, platforms } = colliders();
 
+  const wading = inWater(me.x + PLAYER_W / 2, me.y + PLAYER_H);
+  const speed = MOVE_SPEED * (me.speedMul || 1) * (wading ? WATER_SLOW : 1);
+
   const dir = (held.right ? 1 : 0) - (held.left ? 1 : 0);
-  me.vx = dir * MOVE_SPEED;
+  me.vx = dir * speed;
   if (dir !== 0) me.face = dir;
 
   if (held.jump && me.grounded) {
@@ -33,6 +38,7 @@ export function stepLocal(me, dt, held) {
     me.grounded = false;
   }
   me.vy = Math.min(me.vy + GRAVITY * dt, MAX_FALL);
+  me.inWater = wading;
 
   // Horizontal sweep against solids.
   let nx = me.x + me.vx * dt;
@@ -54,7 +60,8 @@ export function stepLocal(me, dt, held) {
   }
   if (me.vy >= 0) {
     const prevBottom = me.y + PLAYER_H;
-    let landY = GROUND_Y;
+    // Terrain is a solid floor; structure platforms are one-way from above.
+    let landY = groundTop(me.x, PLAYER_W);
     for (const r of platforms) {
       if (me.x + PLAYER_W <= r.x + 4 || me.x >= r.x + r.w - 4) continue;
       if (prevBottom <= r.y + 2 && ny + PLAYER_H >= r.y) landY = Math.min(landY, r.y);

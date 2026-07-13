@@ -1,7 +1,8 @@
 // World + gameplay constants shared by server and client.
 
-export const WORLD_W = 16000;
-export const GROUND_Y = 620;        // y of the walkable ground surface (world px)
+// World width comes from the region layout so the two never drift apart.
+export { WORLD_W } from './regions.js';
+export const GROUND_Y = 602;        // nominal ground; real surface is terrain.groundAt(x)
 
 export const GRAVITY = 2200;        // px/s^2
 export const MOVE_SPEED = 280;      // px/s

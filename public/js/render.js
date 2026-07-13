@@ -84,7 +84,7 @@ export function render(dt) {
 
   ctx.translate(-cam.x, 0);
   drawGround(ctx, cam.x, cam.viewW, br, t);
-  drawNodes(ctx, cam.x, cam.viewW, br);
+  drawNodes(ctx, cam.x, cam.viewW, br, t);
   drawStructures(ctx, cam.x, cam.viewW, br, t);
   if (state.build) drawBuildGhost(ctx, screenToWorldX(mouse.x), br, t);
 

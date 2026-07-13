@@ -48,7 +48,7 @@ function addSmoke(x, y) {
   });
 }
 
-const PUFF_COLORS = { tree: '#8dc26e', rock: '#9aa2b5', bush: '#d9414e' };
+const PUFF_COLORS = { tree: '#8dc26e', rock: '#9aa2b5', bush: '#d9414e', metal: '#e8c46e' };
 
 on('gain', (m) => {
   addFloat(`+${m.qty} ${itemName(m.item)}`, '#ffd76e',
@@ -59,7 +59,7 @@ on('node', (m) => {
   const n = state.nodes.get(m.id);
   if (!n) return;
   const respawned = !m.dep && m.hp >= n.max;
-  if (!respawned) addPuff(n.x, m.dep ? 600 : 520, PUFF_COLORS[n.kind] || '#fff');
+  if (!respawned) addPuff(n.x, n.y - (m.dep ? 8 : 55), PUFF_COLORS[n.kind] || '#fff');
 });
 
 on('fx', (m) => {

@@ -1,10 +1,14 @@
-// Generates resource nodes along the strip. Biomes get richer further out:
-// spawn meadow (berries) -> forest (trees) -> rocky hills (stone) -> deep mix.
+// Generates resource nodes along the strip using each region's node mix.
+// Nodes carry their terrain y so clients never re-derive placement. Streams
+// stay clear of nodes. Also reusable per-chunk for night re-randomization.
 
 import { world, newId } from './state.js';
-import { WORLD_W } from '../shared/const.js';
+import { REGIONS, REGION_W, WORLD_W } from '../shared/regions.js';
+import { groundAt, streamAt } from '../shared/terrain.js';
 
-const NODE_HP = { tree: 60, rock: 80, bush: 30 };
+export const NODE_HP = { tree: 60, rock: 80, bush: 30, metal: 120 };
+const NODE_KINDS = ['tree', 'rock', 'bush', 'metal', null];
+const EDGE = 320;
 
 function mulberry32(seed) {
   let a = seed >>> 0;
@@ -16,37 +20,45 @@ function mulberry32(seed) {
   };
 }
 
-// [tree, rock, bush, nothing] weights by world progress 0..1
-function biomeWeights(t) {
-  if (t < 0.12) return [0.20, 0.10, 0.50, 0.20]; // meadow
-  if (t < 0.45) return [0.60, 0.10, 0.20, 0.10]; // forest
-  if (t < 0.75) return [0.15, 0.55, 0.10, 0.20]; // rocky hills
-  return [0.35, 0.35, 0.20, 0.10];               // deep wilds
-}
-
 function pick(rand, weights) {
-  const kinds = ['tree', 'rock', 'bush', null];
   let r = rand();
   for (let i = 0; i < weights.length; i++) {
-    if (r < weights[i]) return kinds[i];
+    if (r < weights[i]) return NODE_KINDS[i];
     r -= weights[i];
   }
   return null;
 }
 
-export function generateWorld(seed) {
-  const rand = mulberry32(seed);
-  let x = 320;
-  while (x < WORLD_W - 320) {
-    const kind = pick(rand, biomeWeights(x / WORLD_W));
-    if (kind) {
-      const hp = NODE_HP[kind];
-      const id = newId('n');
-      world.nodes.set(id, {
-        id, kind, x: Math.round(x), hp, max: hp, dep: false, depAt: 0,
-      });
+export function makeNode(kind, x) {
+  const hp = NODE_HP[kind];
+  const id = newId('n');
+  return {
+    id, kind, x: Math.round(x), y: Math.round(groundAt(x)),
+    hp, max: hp, dep: false, depAt: 0,
+  };
+}
+
+// Fill [x0, x1) with nodes according to the local region mix. Returns them
+// (already inserted into world.nodes).
+export function generateSpan(x0, x1, rand = Math.random) {
+  const rng = typeof rand === 'function' ? rand : Math.random;
+  const made = [];
+  let x = Math.max(x0, EDGE);
+  const end = Math.min(x1, WORLD_W - EDGE);
+  while (x < end) {
+    const region = REGIONS[Math.min(REGIONS.length - 1, Math.floor(x / REGION_W))];
+    const kind = pick(rng, region.nodes);
+    if (kind && !streamAt(x)) {
+      const n = makeNode(kind, x);
+      world.nodes.set(n.id, n);
+      made.push(n);
     }
-    x += 95 + rand() * 170;
+    x += 85 + rng() * 150;
   }
-  console.log(`worldgen: ${world.nodes.size} resource nodes`);
+  return made;
+}
+
+export function generateWorld(seed) {
+  generateSpan(0, WORLD_W, mulberry32(seed));
+  console.log(`worldgen: ${world.nodes.size} resource nodes across ${REGIONS.length} regions`);
 }

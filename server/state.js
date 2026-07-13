@@ -46,10 +46,15 @@ function evictStaleProfiles() {
     .forEach((k) => delete world.profiles[k]);
 }
 
+// Bump when world geometry changes shape (e.g. the terrain overhaul):
+// old saves are discarded and the world regenerates.
+export const SAVE_VERSION = 2;
+
 export function saveWorld() {
   for (const p of world.players.values()) syncProfile(p);
   evictStaleProfiles();
   const data = {
+    v: SAVE_VERSION,
     time: world.time,
     nextId: world.nextId,
     nodes: [...world.nodes.values()],
@@ -72,6 +77,10 @@ export function loadWorld() {
   if (!existsSync(SAVE_PATH)) return false;
   try {
     const data = JSON.parse(readFileSync(SAVE_PATH, 'utf8'));
+    if (data.v !== SAVE_VERSION) {
+      console.log(`save version ${data.v ?? 1} != ${SAVE_VERSION}; regenerating world`);
+      return false;
+    }
     world.time = data.time || 60;
     world.nextId = data.nextId || 1;
     world.profiles = Object.assign(Object.create(null), data.profiles || {});

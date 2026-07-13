@@ -7,6 +7,7 @@ export const ITEMS = {
   flint:       { name: 'Flint' },
   fiber:       { name: 'Fiber' },
   hide:        { name: 'Hide' },
+  metal_ore:   { name: 'Metal Ore' },
   berry:       { name: 'Berries',     food: { hunger: 8,  hp: 0 } },
   raw_meat:    { name: 'Raw Meat',    food: { hunger: 10, hp: -4 } },
   cooked_meat: { name: 'Cooked Meat', food: { hunger: 30, hp: 8 } },

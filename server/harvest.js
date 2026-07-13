@@ -27,6 +27,12 @@ const YIELDS = {
     pick:  { dmg: 10, rolls: [['berry', 1, 2, 1], ['fiber', 1, 1, 1]] },
     spear: { dmg: 10, rolls: [['berry', 1, 2, 1], ['fiber', 1, 1, 1]] },
   },
+  metal: { // glinting veins; a pick is the real tool for the job
+    hand:  { dmg: 2,  rolls: [['stone', 1, 1, 0.5]] },
+    pick:  { dmg: 15, rolls: [['metal_ore', 1, 2, 1], ['stone', 1, 1, 0.4]] },
+    axe:   { dmg: 6,  rolls: [['stone', 1, 1, 1], ['metal_ore', 1, 1, 0.15]] },
+    spear: { dmg: 2,  rolls: [['stone', 1, 1, 0.3]] },
+  },
 };
 
 const randInt = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1));

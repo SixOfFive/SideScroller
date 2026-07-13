@@ -12,8 +12,9 @@ import { createHash } from 'node:crypto';
 import { world, newId, syncProfile } from './state.js';
 import { wireDinos } from './dinos.js';
 import {
-  MAX_PLAYERS, NAME_MAX, SPAWN_X, GROUND_Y, PLAYER_H, WORLD_W, STATS_MAX,
+  MAX_PLAYERS, NAME_MAX, SPAWN_X, PLAYER_H, WORLD_W, STATS_MAX,
 } from '../shared/const.js';
+import { groundAt } from '../shared/terrain.js';
 
 const JOIN_TIMEOUT_MS = 10000;
 const HEARTBEAT_MS = 10000;
@@ -79,7 +80,9 @@ function doJoin(ws, msg) {
     id: newId('p'), key, ws, tokenHash,
     name: prof && typeof prof.name === 'string' ? prof.name : name,
     x: Number.isFinite(prof?.x) ? prof.x : SPAWN_X + Math.random() * 200,
-    y: Number.isFinite(prof?.y) ? prof.y : GROUND_Y - PLAYER_H,
+    y: Number.isFinite(prof?.y) ? prof.y
+      : groundAt(SPAWN_X + 100) - PLAYER_H - 40, // drop in just above the meadow
+
     vx: 0, face: 1, anim: 'idle',
     hp: Number.isFinite(prof?.stats?.hp) ? prof.stats.hp : STATS_MAX,
     hunger: Number.isFinite(prof?.stats?.hunger) ? prof.stats.hunger : STATS_MAX,

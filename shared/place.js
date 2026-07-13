@@ -3,7 +3,8 @@
 // {kind, x, y} objects.
 
 import { STRUCTURES } from './structures.js';
-import { GROUND_Y, GRID, MAX_WALL_STACK, WORLD_W } from './const.js';
+import { GRID, MAX_WALL_STACK, WORLD_W } from './const.js';
+import { groundAt } from './terrain.js';
 
 function colOf(x) { return Math.round(x / GRID); }
 
@@ -38,8 +39,10 @@ export function computePlacement(kind, wantX, structures) {
     const x = col * GRID;
     if (x < 0 || x + def.w > WORLD_W) return { ok: false, x, y: 0, reason: 'Out of bounds' };
 
+    const gy = groundAt(x + def.w / 2);
+
     if (kind === 'foundation') {
-      const y = GROUND_Y - def.h;
+      const y = gy - def.h;
       if (atCol(structures, col, ['foundation']).length) {
         return { ok: false, x, y, reason: 'Foundation already here' };
       }
@@ -50,8 +53,9 @@ export function computePlacement(kind, wantX, structures) {
     }
 
     if (kind === 'wall' || kind === 'doorframe') {
-      if (!atCol(structures, col, ['foundation']).length) {
-        return { ok: false, x, y: GROUND_Y - 14 - def.h, reason: 'Needs a foundation' };
+      const fnds = atCol(structures, col, ['foundation']);
+      if (!fnds.length) {
+        return { ok: false, x, y: gy - 14 - def.h, reason: 'Needs a foundation' };
       }
       const walls = atCol(structures, col, ['wall', 'doorframe']);
       if (walls.length >= MAX_WALL_STACK) {
@@ -60,7 +64,8 @@ export function computePlacement(kind, wantX, structures) {
       if (atCol(structures, col, ['roof']).length) {
         return { ok: false, x, y: 0, reason: 'Roof is in the way' };
       }
-      const y = GROUND_Y - 14 - def.h * (walls.length + 1);
+      const foundationTop = fnds[0].y; // walls stack up from the foundation
+      const y = foundationTop - def.h * (walls.length + 1);
       return { ok: true, x, y };
     }
 
@@ -77,9 +82,9 @@ export function computePlacement(kind, wantX, structures) {
     return { ok: false, reason: 'Unknown grid piece' };
   }
 
-  // Free-standing pieces (campfire, storage box) sit on the ground.
+  // Free-standing pieces (campfire, storage, forge) sit on the terrain.
   const x = Math.round(wantX - def.w / 2);
-  const y = GROUND_Y - def.h;
+  const y = groundAt(x + def.w / 2) - def.h;
   if (x < 0 || x + def.w > WORLD_W) return { ok: false, x, y, reason: 'Out of bounds' };
   const hit = overlaps(structures, x, y, def.w, def.h);
   if (hit) return { ok: false, x, y, reason: 'Blocked by ' + STRUCTURES[hit.kind].name };

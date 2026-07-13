@@ -6,6 +6,7 @@ import {
   TICK_HZ, SNAP_HZ, NODE_RESPAWN_MS, STATS_MAX, SPAWN_X, GROUND_Y, PLAYER_H,
   HUNGER_DRAIN_PS, STARVE_HP_PS, REGEN_HP_PS, REGEN_HUNGER_MIN,
 } from '../shared/const.js';
+import { groundAt } from '../shared/terrain.js';
 import { send, sendStats, broadcast, wirePlayer } from './net.js';
 import { updateDinos, wireDinos } from './dinos.js';
 
@@ -15,7 +16,7 @@ function respawn(p) {
   p.hp = STATS_MAX;
   p.hunger = 60;
   p.x = SPAWN_X + Math.random() * 100;
-  p.y = GROUND_Y - PLAYER_H;
+  p.y = groundAt(p.x + 14) - PLAYER_H;
   send(p, { t: 'dead', x: p.x, y: p.y });
   sendStats(p);
   broadcast({ t: 'chat', from: '', text: `${p.name} starved and washed back up at the beach.` });

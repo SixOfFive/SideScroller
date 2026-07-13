@@ -15,7 +15,7 @@ const SLOTS = [
   { key: '4', item: 'spear', label: 'Spear' },
 ];
 
-const NODE_NAMES = { tree: 'Tree', rock: 'Stone Pile', bush: 'Berry Bush' };
+const NODE_NAMES = { tree: 'Tree', rock: 'Stone Pile', bush: 'Berry Bush', metal: 'Metal Vein' };
 
 function bar(ctx, x, y, w, h, frac, color, label) {
   ctx.fillStyle = 'rgba(8,11,20,0.72)';
