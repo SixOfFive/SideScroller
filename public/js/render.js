@@ -80,6 +80,15 @@ export function render(dt) {
   ctx.save();
   ctx.scale(cam.scale, cam.scale);
 
+  // decay + apply screen shake (from taking hits)
+  const me = state.me;
+  me.shake = Math.max(0, (me.shake || 0) - dt * 2.4);
+  me.hurtT = Math.max(0, (me.hurtT || 0) - dt);
+  if (me.shake > 0.01) {
+    const s = me.shake * 9;
+    ctx.translate((Math.sin(t * 0.09) * s), (Math.cos(t * 0.13) * s * 0.6));
+  }
+
   drawBg(ctx, cam.viewW, VIEW_H, cam.x, wt);
 
   ctx.translate(-cam.x, 0);
@@ -97,7 +106,6 @@ export function render(dt) {
     drawPlayer(ctx, pos.x, pos.y,
       { name: p.n, face: p.f, anim: p.a, tool: toolOf(p.e), hp: p.h }, br, t);
   }
-  const me = state.me;
   drawPlayer(ctx, me.x, me.y, {
     name: state.name, face: me.face, anim: me.anim, tool: toolOf(me.equip),
     hp: me.hp, isMe: true, swingProg: 1 - me.swingT / 0.35,
@@ -106,6 +114,18 @@ export function render(dt) {
   drawFx(ctx, dt, cam.x, cam.viewW);
   drawNight(br);
   ctx.restore();
+
+  // damage flash + low-HP vignette in screen space
+  const dangerA = Math.max(me.hurtT * 1.3, me.hp < 30 ? (30 - me.hp) / 90 : 0);
+  if (dangerA > 0.01) {
+    const g = ctx.createRadialGradient(
+      canvas.width / 2, canvas.height / 2, canvas.height * 0.3,
+      canvas.width / 2, canvas.height / 2, canvas.height * 0.75);
+    g.addColorStop(0, 'rgba(180,20,20,0)');
+    g.addColorStop(1, `rgba(180,20,20,${Math.min(0.6, dangerA).toFixed(3)})`);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
 
   drawHud(ctx);
 }

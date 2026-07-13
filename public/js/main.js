@@ -13,8 +13,10 @@ import {
   openStorage, closeAllPanels,
 } from './ui.js';
 import { initChat, focusChat } from './chat.js';
-import { HARVEST_RANGE, INTERACT_RANGE } from '/shared/const.js';
+import { HARVEST_RANGE, INTERACT_RANGE, PLAYER_W, PLAYER_H } from '/shared/const.js';
 import { STRUCTURES } from '/shared/structures.js';
+import { DINODEFS } from '/shared/dinodefs.js';
+import { interp } from './state.js';
 
 const canvas = document.getElementById('game');
 initRender(canvas);
@@ -55,15 +57,23 @@ on('welcome', () => joinEl.classList.add('hidden'));
 const EQUIP_SLOTS = { equip1: '', equip2: 'stone_axe', equip3: 'stone_pick', equip4: 'spear' };
 
 function doSwing() {
-  if (state.me.swingT > 0.05) return;
+  if (state.me.mounted || state.me.swingT > 0.05) return;
   state.me.swingT = 0.35;
   const cx = meCenter();
   const node = findNearestNode(HARVEST_RANGE + 40);
-  const dino = findNearestDino(HARVEST_RANGE + 40, (d) => !d.o);
+  // wide detection so big dinos (rex) register; the server range-checks by size
+  const dino = findNearestDino(HARVEST_RANGE + 120, (d) => !d.o);
   const nodeD = node ? Math.abs(node.x - cx) : Infinity;
-  const dinoD = dino ? Math.abs(dino.x - cx) : Infinity;
+  const dinoD = dino ? Math.abs(dino.x + (DINODEFS[dino.sp]?.w || 40) / 2 - cx) : Infinity;
   if (dino && dinoD <= nodeD) sendMsg({ t: 'attack', dino: dino.i });
   else if (node) sendMsg({ t: 'harvest', node: node.id });
+}
+
+function toggleMount() {
+  if (state.me.mounted) { sendMsg({ t: 'dinoCmd', dino: state.me.mountId, cmd: 'dismount' }); return; }
+  const d = findNearestDino(INTERACT_RANGE + 90, (dd) => dd.o === state.name && DINODEFS[dd.sp]?.rideable);
+  if (d) sendMsg({ t: 'dinoCmd', dino: d.i, cmd: 'mount' });
+  else toast('No mount of yours nearby');
 }
 
 function doInteract() {
@@ -126,6 +136,7 @@ function processActions() {
         if (d) sendMsg({ t: 'dinoCmd', dino: d.i, cmd: d.s === 'stay' ? 'follow' : 'stay' });
         break;
       }
+      case 'mount': toggleMount(); break;
       case 'chat': focusChat(); break;
       case 'escape':
         if (state.build) cancelBuild();
@@ -153,12 +164,27 @@ function updateHover() {
 
 window.__game = { state, sendMsg, cam, screenToWorldX }; // debug/testing handle
 
+// While mounted, the server owns the rider's position (seated on the dino);
+// the client just tracks the dino's interpolated position.
+function rideAlong() {
+  const d = state.dinos.get(state.me.mountId);
+  if (!d) return;
+  const def = DINODEFS[d.sp];
+  const pos = interp(d);
+  state.me.x = pos.x + (def.w - PLAYER_W) / 2;
+  state.me.y = pos.y - PLAYER_H + 18;
+  state.me.vx = 0; state.me.vy = 0;
+  state.me.face = d.f;
+  state.me.anim = 'idle';
+}
+
 let last = performance.now();
 function frame(now) {
   const dt = Math.min((now - last) / 1000, 0.05);
   last = now;
   if (state.joined) {
-    stepLocal(state.me, dt, held);
+    if (state.me.mounted) rideAlong();
+    else stepLocal(state.me, dt, held);
     processActions();
     updateHover();
     render(dt);
@@ -171,6 +197,14 @@ requestAnimationFrame(frame);
 
 setInterval(() => {
   if (!state.joined) return;
+  if (state.me.mounted) {
+    sendMsg({
+      t: 'input',
+      ride: (held.right ? 1 : 0) - (held.left ? 1 : 0),
+      rj: held.jump ? 1 : 0,
+    });
+    return;
+  }
   sendMsg({
     t: 'input',
     x: Math.round(state.me.x * 10) / 10,

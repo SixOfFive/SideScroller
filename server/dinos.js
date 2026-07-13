@@ -1,32 +1,43 @@
-// Dino systems: spawning, wander/flee AI, hunting, passive taming with food,
-// tamed follow/stay, and egg laying. Dodo first; new species are DINODEFS
-// entries plus a client sprite.
+// Dino systems: per-region spawning, wander/flee/chase/attack AI, two-way
+// combat (players hit dinos, aggressive dinos hit players), passive taming,
+// tamed follow/stay, rideable mounts, and egg laying.
 
 import { world, newId } from './state.js';
-import { DINODEFS } from '../shared/dinodefs.js';
-import {
-  WORLD_W, GROUND_Y, HARVEST_RANGE, INTERACT_RANGE, PLAYER_W,
-} from '../shared/const.js';
+import { DINODEFS, WEAPON_DMG } from '../shared/dinodefs.js';
+import { REGIONS, REGION_W } from '../shared/regions.js';
+import { WORLD_W, HARVEST_RANGE, INTERACT_RANGE, PLAYER_W, PLAYER_H, GRAVITY } from '../shared/const.js';
 import { groundAt } from '../shared/terrain.js';
-import { send, toast, sendInv, broadcast } from './net.js';
+import { send, toast, sendInv, sendStats, broadcast } from './net.js';
 import { invAdd, invRemove } from './inventory.js';
 import { swingReady, playerTool } from './harvest.js';
 
-const DODO_CAP = 14;
-const SPAWN_CHECK_S = 20;
-const SPAWN_MIN_X = 1200;
-const PLAYER_CLEARANCE = 500;
-const WEAPON_DMG = { spear: 15, axe: 8, pick: 8, hand: 4 };
+const SPAWN_CHECK_S = 8;
+const REGION_TARGET = [4, 5, 6, 6, 6]; // wild dinos alive per region band
+const PLAYER_CLEARANCE = 620;
+const SAFE_X = REGION_W;                // aggressive dinos won't cross into the meadow
 
 const randInt = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1));
+const pickWeighted = (list) => {
+  let total = 0;
+  for (const e of list) total += e.w;
+  let r = Math.random() * total;
+  for (const e of list) { if ((r -= e.w) < 0) return e.sp; }
+  return list[0].sp;
+};
 
 function dinoCenter(d) { return d.x + DINODEFS[d.sp].w / 2; }
 function playerCenter(p) { return p.x + PLAYER_W / 2; }
+function regionOf(x) { return Math.min(REGIONS.length - 1, Math.max(0, Math.floor(x / REGION_W))); }
 
-function spawnDino(sp) {
+// --- spawning ---------------------------------------------------------------
+
+function spawnDinoInRegion(idx) {
+  const region = REGIONS[idx];
+  if (!region.dinos.length) return null;
+  const sp = pickWeighted(region.dinos);
   const def = DINODEFS[sp];
-  for (let tries = 0; tries < 12; tries++) {
-    const x = SPAWN_MIN_X + Math.random() * (WORLD_W - SPAWN_MIN_X - 400);
+  for (let tries = 0; tries < 10; tries++) {
+    const x = idx * REGION_W + 120 + Math.random() * (REGION_W - 240);
     let clear = true;
     for (const p of world.players.values()) {
       if (Math.abs(p.x - x) < PLAYER_CLEARANCE) { clear = false; break; }
@@ -34,10 +45,11 @@ function spawnDino(sp) {
     if (!clear) continue;
     const d = {
       id: newId('d'), sp,
-      x, y: groundAt(x + def.w / 2) - def.h, face: Math.random() < 0.5 ? -1 : 1,
+      x, y: groundAt(x + def.w / 2) - def.h, vy: 0,
+      face: Math.random() < 0.5 ? -1 : 1,
       state: 'idle', stateT: 1 + Math.random() * 3, targetX: x,
       hp: def.hp, tame: 0, owner: null, name: def.name,
-      lastFedAt: 0, fleeFrom: 0, eggAt: 0,
+      lastFedAt: 0, fleeFrom: 0, eggAt: 0, lastBite: 0, rider: null,
     };
     world.dinos.set(d.id, d);
     return d;
@@ -45,80 +57,165 @@ function spawnDino(sp) {
   return null;
 }
 
-let spawnAcc = SPAWN_CHECK_S; // first check fires immediately after boot
+let spawnAcc = SPAWN_CHECK_S;
 
 function maybeSpawn(dt) {
   spawnAcc += dt;
   if (spawnAcc < SPAWN_CHECK_S) return;
   spawnAcc = 0;
-  let wild = 0;
-  for (const d of world.dinos.values()) if (!d.owner) wild++;
-  const deficit = DODO_CAP - wild;
-  if (deficit <= 0) return;
-  const batch = wild === 0 ? Math.min(8, deficit) : 1;
-  for (let i = 0; i < batch; i++) spawnDino('dodo');
+  const counts = new Array(REGIONS.length).fill(0);
+  for (const d of world.dinos.values()) if (!d.owner) counts[regionOf(dinoCenter(d))]++;
+  for (let i = 0; i < REGIONS.length; i++) {
+    if (counts[i] < REGION_TARGET[i]) spawnDinoInRegion(i); // one per region per check
+  }
 }
 
-function ownerOf(d) {
-  for (const p of world.players.values()) if (p.name === d.owner) return p;
-  return null;
+// --- combat: dinos hurting players ------------------------------------------
+
+function nearestPlayer(d, range) {
+  let best = null, bd = range;
+  const cx = dinoCenter(d);
+  for (const p of world.players.values()) {
+    if (playerCenter(p) < SAFE_X) continue;   // safe hub
+    const dist = Math.abs(playerCenter(p) - cx);
+    if (dist < bd) { bd = dist; best = p; }
+  }
+  return best;
+}
+
+function bite(d, p, def, now) {
+  d.lastBite = now;
+  // A mounted rider is shielded — the mount soaks the hit instead.
+  if (p.mount && world.dinos.has(p.mount)) {
+    const mount = world.dinos.get(p.mount);
+    mount.hp -= def.dmg;
+    broadcast({ t: 'fx', kind: 'hit', x: dinoCenter(mount), y: mount.y + 20 });
+    if (mount.hp <= 0) killDino(mount, null);
+    return;
+  }
+  if (!world.settings.damage) return;
+  p.hp = Math.max(0, p.hp - def.dmg);
+  p.deathCause = def.name;
+  const kx = Math.sign(playerCenter(p) - dinoCenter(d)) || 1;
+  send(p, { t: 'hurt', dmg: Math.round(def.dmg), kx: kx * 260 });
+  sendStats(p);
+  broadcast({ t: 'fx', kind: 'hit', x: playerCenter(p), y: p.y + 20 });
+}
+
+// --- movement helpers -------------------------------------------------------
+
+function walkOnGround(d, def) {
+  d.x = Math.min(Math.max(d.x, 40), WORLD_W - 40 - def.w);
+  d.y = groundAt(d.x + def.w / 2) - def.h;
+  d.vy = 0;
+}
+
+function killDino(d, byPlayer) {
+  const def = DINODEFS[d.sp];
+  if (byPlayer) {
+    for (const [item, [lo, hi]] of Object.entries(def.drops)) {
+      const qty = randInt(lo, hi);
+      if (qty > 0) { invAdd(byPlayer.inv, item, qty); send(byPlayer, { t: 'gain', item, qty }); }
+    }
+    sendInv(byPlayer);
+  }
+  // free any rider
+  if (d.rider) {
+    for (const p of world.players.values()) {
+      if (p.name === d.rider) { p.mount = null; send(p, { t: 'dismount' }); }
+    }
+  }
+  broadcast({ t: 'fx', kind: 'poof', x: dinoCenter(d), y: d.y + 15 });
+  world.dinos.delete(d.id);
+}
+
+// --- per-dino step ----------------------------------------------------------
+
+function stepTamed(d, def, dt, now) {
+  if (d.rider) return; // ridden movement handled separately
+  if (d.state !== 'stay') {
+    d.state = 'follow';
+    const o = ownerOf(d);
+    if (o) {
+      const dx = playerCenter(o) - dinoCenter(d);
+      if (Math.abs(dx) > 1600) d.x = o.x - 80 * Math.sign(dx || 1);
+      else if (Math.abs(dx) > 100) {
+        d.face = Math.sign(dx);
+        d.x += Math.sign(dx) * Math.max(def.speed * 1.7, 160) * dt;
+      }
+    }
+  }
+  if (d.eggAt && now >= d.eggAt) layEgg(d, def, now);
+  walkOnGround(d, def);
+}
+
+function stepAggressive(d, def, dt, now) {
+  const target = nearestPlayer(d, def.aggro);
+  if (target) {
+    const dx = playerCenter(target) - dinoCenter(d);
+    d.face = Math.sign(dx) || d.face;
+    if (Math.abs(dx) <= def.attackRange) {
+      d.state = 'attack';
+      if (now - d.lastBite >= def.attackCd * 1000) bite(d, target, def, now);
+    } else {
+      d.state = 'chase';
+      let nx = d.x + Math.sign(dx) * def.speed * dt;
+      if (nx + def.w / 2 < SAFE_X) nx = SAFE_X - def.w / 2; // leash at the hub
+      d.x = nx;
+    }
+  } else {
+    wander(d, def, dt);
+  }
+  walkOnGround(d, def);
+}
+
+function wander(d, def, dt) {
+  if (d.state === 'walk') {
+    const dx = d.targetX - d.x;
+    if (Math.abs(dx) < 8) { d.state = 'idle'; d.stateT = 2 + Math.random() * 4; }
+    else { d.face = Math.sign(dx); d.x += d.face * def.speed * 0.6 * dt; }
+  } else {
+    d.stateT -= dt;
+    if (d.stateT <= 0) { d.state = 'walk'; d.targetX = d.x + (Math.random() - 0.5) * 700; }
+  }
+}
+
+function stepFlee(d, def, dt) {
+  d.stateT -= dt;
+  d.face = Math.sign(dinoCenter(d) - d.fleeFrom) || 1;
+  d.x += d.face * def.fleeSpeed * dt;
+  if (d.stateT <= 0) { d.state = 'idle'; d.stateT = 2 + Math.random() * 2; }
+  walkOnGround(d, def);
+}
+
+function stepRidden(d, def, dt) {
+  const rider = riderOf(d);
+  if (!rider) { d.rider = null; d.state = 'idle'; return; }
+  const dir = rider.rideDir || 0;
+  if (dir) d.face = dir;
+  d.x += dir * (def.rideSpeed || def.speed) * dt;
+  d.x = Math.min(Math.max(d.x, 40), WORLD_W - 40 - def.w);
+
+  const groundY = groundAt(d.x + def.w / 2) - def.h;
+  if (rider.rideJump && Math.abs(d.y - groundY) < 4) d.vy = -(def.rideJump || 700);
+  d.vy = Math.min((d.vy || 0) + GRAVITY * dt, 1400);
+  d.y += d.vy * dt;
+  if (d.y >= groundY) { d.y = groundY; d.vy = 0; }
+
+  // seat the rider on the dino's back
+  rider.x = d.x + (def.w - PLAYER_W) / 2;
+  rider.y = d.y - PLAYER_H + 18;
+  rider.face = d.face;
 }
 
 function stepDino(d, dt, now) {
   const def = DINODEFS[d.sp];
-
-  if (d.owner) {
-    if (d.state !== 'stay') {
-      d.state = 'follow';
-      const o = ownerOf(d);
-      if (o) {
-        const dx = playerCenter(o) - dinoCenter(d);
-        if (Math.abs(dx) > 1400) {
-          d.x = o.x - 70 * Math.sign(dx || 1); // waddled too far behind: catch up
-        } else if (Math.abs(dx) > 90) {
-          d.face = Math.sign(dx);
-          d.x += Math.sign(dx) * Math.max(def.speed * 1.7, 150) * dt;
-        }
-      }
-    }
-    // egg timer
-    if (d.eggAt && now >= d.eggAt) {
-      const o = ownerOf(d);
-      if (o) {
-        invAdd(o.inv, 'egg', 1);
-        send(o, { t: 'gain', item: 'egg', qty: 1 });
-        sendInv(o);
-        toast(o, `${d.name} laid an egg!`);
-        broadcast({ t: 'fx', kind: 'heart', x: dinoCenter(d), y: d.y - 6 });
-        d.eggAt = now + randInt(def.eggIntervalS[0], def.eggIntervalS[1]) * 1000;
-      } else {
-        d.eggAt = now + 60000; // owner offline; retry later
-      }
-    }
-  } else if (d.state === 'flee') {
-    d.stateT -= dt;
-    d.face = Math.sign(dinoCenter(d) - d.fleeFrom) || 1;
-    d.x += d.face * def.fleeSpeed * dt;
-    if (d.stateT <= 0) { d.state = 'idle'; d.stateT = 2 + Math.random() * 2; }
-  } else if (d.state === 'walk') {
-    const dx = d.targetX - d.x;
-    if (Math.abs(dx) < 8) {
-      d.state = 'idle';
-      d.stateT = 2 + Math.random() * 4;
-    } else {
-      d.face = Math.sign(dx);
-      d.x += d.face * def.speed * dt;
-    }
-  } else { // idle
-    d.stateT -= dt;
-    if (d.stateT <= 0) {
-      d.state = 'walk';
-      d.targetX = d.x + (Math.random() - 0.5) * 700;
-    }
-  }
-
-  d.x = Math.min(Math.max(d.x, 60), WORLD_W - 60 - def.w);
-  d.y = groundAt(d.x + def.w / 2) - def.h;
+  if (d.rider) { stepRidden(d, def, dt); return; }
+  if (d.owner) { stepTamed(d, def, dt, now); return; }
+  if (d.state === 'flee') { stepFlee(d, def, dt); return; }
+  if (def.behavior === 'aggressive') { stepAggressive(d, def, dt, now); return; }
+  wander(d, def, dt);
+  walkOnGround(d, def);
 }
 
 export function updateDinos(dt, now) {
@@ -126,61 +223,83 @@ export function updateDinos(dt, now) {
   for (const d of world.dinos.values()) stepDino(d, dt, now);
 }
 
+// --- helpers over players ---------------------------------------------------
+
+function ownerOf(d) {
+  for (const p of world.players.values()) if (p.name === d.owner) return p;
+  return null;
+}
+function riderOf(d) {
+  for (const p of world.players.values()) if (p.name === d.rider) return p;
+  return null;
+}
+function layEgg(d, def, now) {
+  const o = ownerOf(d);
+  if (o) {
+    invAdd(o.inv, 'egg', 1);
+    send(o, { t: 'gain', item: 'egg', qty: 1 });
+    sendInv(o);
+    toast(o, `${d.name} laid an egg!`);
+    broadcast({ t: 'fx', kind: 'heart', x: dinoCenter(d), y: d.y - 6 });
+    d.eggAt = now + randInt(def.egg[0], def.egg[1]) * 1000;
+  } else {
+    d.eggAt = now + 60000;
+  }
+}
+
+// --- network wire -----------------------------------------------------------
+
 export function wireDinos() {
   return [...world.dinos.values()].map((d) => ({
     i: d.id, sp: d.sp,
     x: Math.round(d.x), y: Math.round(d.y), f: d.face, s: d.state,
     tm: Math.round(d.tame * 100) / 100, o: d.owner, h: Math.round(d.hp),
-    nm: d.name,
+    nm: d.name, r: d.rider ? 1 : 0,
   }));
 }
+
+// --- message handlers -------------------------------------------------------
 
 export function attack(p, m) {
   const d = world.dinos.get(m.dino);
   if (!d) return;
   if (d.owner) { toast(p, `${d.name} is tamed — leave it be`); return; }
   if (!swingReady(p)) return;
-  if (Math.abs(dinoCenter(d) - playerCenter(p)) > HARVEST_RANGE + 60) return;
+  if (Math.abs(dinoCenter(d) - playerCenter(p)) > HARVEST_RANGE + DINODEFS[d.sp].w / 2) return;
 
-  d.hp -= WEAPON_DMG[playerTool(p)] || 4;
-  if (d.tame > 0) d.tame = 0; // violence ruins trust
-  d.state = 'flee';
-  d.fleeFrom = playerCenter(p);
-  d.stateT = 4;
-  broadcast({ t: 'fx', kind: 'hit', x: dinoCenter(d), y: d.y + 10 });
-
-  if (d.hp <= 0) {
-    const def = DINODEFS[d.sp];
-    for (const [item, [lo, hi]] of Object.entries(def.drops)) {
-      const qty = randInt(lo, hi);
-      invAdd(p.inv, item, qty);
-      send(p, { t: 'gain', item, qty });
-    }
-    sendInv(p);
-    broadcast({ t: 'fx', kind: 'poof', x: dinoCenter(d), y: d.y + 15 });
-    world.dinos.delete(d.id);
+  d.hp -= WEAPON_DMG[playerTool(p)] || WEAPON_DMG.hand;
+  if (d.tame > 0) d.tame = 0;
+  const def = DINODEFS[d.sp];
+  // Passive things flee; aggressive things turn and fight (brief lunge back).
+  if (def.behavior === 'passive') {
+    d.state = 'flee'; d.fleeFrom = playerCenter(p); d.stateT = 4;
+  } else {
+    d.lastBite = Math.max(d.lastBite, Date.now() - def.attackCd * 1000 + 250);
   }
+  broadcast({ t: 'fx', kind: 'hit', x: dinoCenter(d), y: d.y + 10 });
+  if (d.hp <= 0) killDino(d, p);
 }
 
 export function feed(p, m) {
   const d = world.dinos.get(m.dino);
   if (!d || d.owner) return;
   const def = DINODEFS[d.sp];
-  if (Math.abs(dinoCenter(d) - playerCenter(p)) > INTERACT_RANGE + 60) return;
+  if (!def.tame) { toast(p, `${def.name}s can't be tamed that way`); return; }
+  if (Math.abs(dinoCenter(d) - playerCenter(p)) > INTERACT_RANGE + def.w / 2) return;
 
   const now = Date.now();
-  if (now - d.lastFedAt < def.feedCooldownS * 1000) {
+  if (now - d.lastFedAt < def.tame.cooldownS * 1000) {
     toast(p, `The ${def.name.toLowerCase()} is still munching…`);
     return;
   }
-  if (!invRemove(p.inv, def.tameFood, 1)) {
-    toast(p, `You need ${def.tameFood === 'berry' ? 'berries' : def.tameFood} to tame it`);
+  if (!invRemove(p.inv, def.tame.food, 1)) {
+    toast(p, `You need ${def.tame.food === 'berry' ? 'berries' : def.tame.food} to tame it`);
     return;
   }
   d.lastFedAt = now;
-  d.tame += 1 / def.tameFeeds;
+  d.tame += 1 / def.tame.feeds;
   d.state = 'idle';
-  d.stateT = def.feedCooldownS; // it stays put while digesting
+  d.stateT = def.tame.cooldownS;
   broadcast({ t: 'fx', kind: 'heart', x: dinoCenter(d), y: d.y - 6 });
   sendInv(p);
 
@@ -188,20 +307,34 @@ export function feed(p, m) {
     d.tame = 1;
     d.owner = p.name;
     d.state = 'follow';
-    d.eggAt = now + randInt(def.eggIntervalS[0], def.eggIntervalS[1]) * 1000;
+    if (def.egg) d.eggAt = now + randInt(def.egg[0], def.egg[1]) * 1000;
     broadcast({ t: 'chat', from: '', text: `${p.name} tamed a ${def.name}!` });
-    toast(p, `${def.name} tamed! It follows you now — T to make it stay.`);
+    toast(p, def.rideable
+      ? `${def.name} tamed! T follow/stay · R to ride.`
+      : `${def.name} tamed! It follows you — T to make it stay.`);
   }
 }
 
 export function dinoCmd(p, m) {
   const d = world.dinos.get(m.dino);
   if (!d || d.owner !== p.name) return;
-  if (m.cmd === 'stay') {
-    d.state = 'stay';
-    toast(p, `${d.name} will wait here`);
-  } else if (m.cmd === 'follow') {
-    d.state = 'follow';
-    toast(p, `${d.name} is following you`);
+  const def = DINODEFS[d.sp];
+  if (m.cmd === 'stay') { d.state = 'stay'; d.rider = null; if (p.mount === d.id) p.mount = null; toast(p, `${d.name} will wait here`); }
+  else if (m.cmd === 'follow') { d.state = 'follow'; toast(p, `${d.name} is following you`); }
+  else if (m.cmd === 'mount') {
+    if (!def.rideable) { toast(p, `You can't ride a ${def.name}`); return; }
+    if (Math.abs(dinoCenter(d) - playerCenter(p)) > INTERACT_RANGE + def.w / 2) return;
+    if (p.mount) { const old = world.dinos.get(p.mount); if (old) old.rider = null; }
+    d.rider = p.name; d.state = 'ridden'; p.mount = d.id;
+    send(p, { t: 'mount', dino: d.id });
+    toast(p, `Riding ${d.name} — A/D move, Space jump, R dismount.`);
+  } else if (m.cmd === 'dismount') {
+    if (p.mount === d.id) { d.rider = null; d.state = 'follow'; p.mount = null; send(p, { t: 'dismount' }); }
   }
+}
+
+// Rider control values arrive on the player's input message (handlers.js).
+export function setRideInput(p, dir, jump) {
+  p.rideDir = dir;
+  p.rideJump = jump;
 }

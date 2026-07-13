@@ -68,6 +68,11 @@ on('fx', (m) => {
   if (m.kind === 'hit') addPuff(m.x, m.y, '#e0654e', 5);
 });
 
+on('hurt', (m) => {
+  addPuff(state.me.x + PLAYER_W / 2, state.me.y + 20, '#e0654e', 8);
+  addFloat(`-${m.dmg}`, '#ff6a5a', state.me.x + PLAYER_W / 2, state.me.y - 10);
+});
+
 export function drawFx(ctx, dt, camX, viewW) {
   // campfire smoke + embers
   smokeAcc += dt;

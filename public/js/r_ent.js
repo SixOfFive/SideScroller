@@ -113,61 +113,177 @@ export function drawPlayer(ctx, x, y, info, br, t) {
   }
 }
 
-// d: dino wire {i, x, y, f, s, tm, o, h, nm, sp} at interpolated pos
-export function drawDino(ctx, x, y, d, br, t) {
-  const def = DINODEFS[d.sp || 'dodo'];
-  const h = typeof d.i === 'string' ? nameHash(d.i) : d.i;
+// Per-species visual params. hue drives body color; the rest tweak silhouette.
+const LOOK = {
+  compy:    { hue: 96,  sat: 40, jaw: 0.6, crest: 0, frill: 0, tail: 1.15, arm: 0.5, teeth: 0 },
+  dilo:     { hue: 38,  sat: 46, jaw: 0.85, crest: 0.7, frill: 1, tail: 1.0, arm: 0.6, teeth: 1 },
+  parasaur: { hue: 150, sat: 34, jaw: 0.5, crest: 1.6, frill: 0, tail: 1.25, arm: 0.4, teeth: 0 },
+  raptor:   { hue: 184, sat: 40, jaw: 0.95, crest: 0, frill: 0, tail: 1.2, arm: 0.7, teeth: 1, claw: 1 },
+  rex:      { hue: 20,  sat: 42, jaw: 1.5, crest: 0, frill: 0, tail: 1.0, arm: 0.25, teeth: 1 },
+};
+
+// A generic theropod filling the [0,-H]x[±W/2] box, facing +x, feet at y=0.
+function drawTheropod(ctx, d, def, look, h, br, t) {
+  const W = def.w, H = def.h;
+  const indiv = (hash01(h) - 0.5) * 10;
+  const L = (l) => Math.max(0, Math.min(100, l * (0.42 + br * 0.58)));
+  const body = `hsl(${look.hue + indiv}, ${look.sat}%, ${L(38)}%)`;
+  const dark = `hsl(${look.hue + indiv}, ${look.sat}%, ${L(28)}%)`;
+  const belly = `hsl(${look.hue + indiv}, ${look.sat - 6}%, ${L(52)}%)`;
+  const moving = d.s === 'walk' || d.s === 'flee' || d.s === 'follow' || d.s === 'chase' || d.s === 'ridden';
+  const spd = d.s === 'flee' || d.s === 'chase' ? 0.03 : 0.016;
+  const gait = moving ? Math.sin(t * spd + h) : 0;
+  const hipY = -H * 0.44;
+
+  // tail
+  ctx.fillStyle = dark;
+  ctx.beginPath();
+  ctx.moveTo(-W * 0.1, hipY);
+  ctx.quadraticCurveTo(-W * 0.5 * look.tail, hipY + H * 0.05, -W * 0.62 * look.tail, -H * 0.05);
+  ctx.quadraticCurveTo(-W * 0.42, hipY + H * 0.16, -W * 0.05, hipY + H * 0.06);
+  ctx.closePath(); ctx.fill();
+
+  // far leg (behind)
+  ctx.strokeStyle = dark;
+  ctx.lineWidth = Math.max(4, H * 0.09);
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(W * 0.02, hipY);
+  ctx.lineTo(W * 0.02 - gait * W * 0.12, -2);
+  ctx.stroke();
+
+  // body
+  ctx.fillStyle = body;
+  ctx.beginPath();
+  ctx.ellipse(-W * 0.02, hipY - H * 0.02, W * 0.34, H * 0.26, -0.15, 0, 7);
+  ctx.fill();
+  ctx.fillStyle = belly;
+  ctx.beginPath();
+  ctx.ellipse(W * 0.04, hipY + H * 0.05, W * 0.22, H * 0.15, -0.15, 0, 7);
+  ctx.fill();
+
+  // near leg (front, animated) with clawed foot
+  ctx.strokeStyle = body;
+  ctx.lineWidth = Math.max(4, H * 0.1);
+  ctx.beginPath();
+  const footX = W * 0.06 + gait * W * 0.12;
+  ctx.moveTo(W * 0.06, hipY);
+  ctx.lineTo(footX, -2);
+  ctx.stroke();
+  if (look.claw) {
+    ctx.strokeStyle = '#e9e4d0'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(footX, -2); ctx.lineTo(footX + W * 0.05, -H * 0.09); ctx.stroke();
+  }
+
+  // little arm
+  if (look.arm) {
+    ctx.strokeStyle = dark;
+    ctx.lineWidth = Math.max(2.5, H * 0.05);
+    ctx.beginPath();
+    ctx.moveTo(W * 0.16, hipY - H * 0.05);
+    ctx.lineTo(W * 0.22, hipY + H * 0.06 * look.arm + gait * 3);
+    ctx.stroke();
+  }
+
+  // neck + head
+  const headX = W * 0.3, headY = hipY - H * 0.34;
+  ctx.strokeStyle = body;
+  ctx.lineWidth = H * 0.18;
+  ctx.beginPath();
+  ctx.moveTo(W * 0.12, hipY - H * 0.12);
+  ctx.quadraticCurveTo(W * 0.26, hipY - H * 0.3, headX, headY);
+  ctx.stroke();
+
+  // frill (dilo)
+  if (look.frill) {
+    ctx.fillStyle = `hsl(${(look.hue + 180) % 360}, 55%, ${L(50)}%)`;
+    ctx.beginPath();
+    ctx.ellipse(headX - W * 0.03, headY, W * 0.11, H * 0.16, 0, 0, 7);
+    ctx.fill();
+  }
+  // head
+  ctx.fillStyle = body;
+  ctx.beginPath();
+  ctx.ellipse(headX, headY, W * 0.12, H * 0.12, 0.15, 0, 7);
+  ctx.fill();
+  // crest (parasaur/dilo)
+  if (look.crest) {
+    ctx.fillStyle = dark;
+    ctx.beginPath();
+    ctx.moveTo(headX - W * 0.02, headY - H * 0.08);
+    ctx.lineTo(headX - W * 0.16 * look.crest, headY - H * 0.24 * look.crest);
+    ctx.lineTo(headX + W * 0.04, headY - H * 0.05);
+    ctx.closePath(); ctx.fill();
+  }
+  // jaw / snout
+  const jw = W * 0.14 * look.jaw, jh = H * 0.07 * look.jaw;
+  ctx.fillStyle = body;
+  ctx.beginPath();
+  ctx.moveTo(headX + W * 0.06, headY - jh);
+  ctx.lineTo(headX + W * 0.06 + jw, headY - jh * 0.3);
+  ctx.lineTo(headX + W * 0.06 + jw, headY + jh);
+  ctx.lineTo(headX + W * 0.06, headY + jh * 0.8);
+  ctx.closePath(); ctx.fill();
+  if (look.teeth) {
+    ctx.fillStyle = '#f2eede';
+    for (let i = 0; i < 3; i++) {
+      const tx = headX + W * 0.08 + (jw * (i + 0.5)) / 3;
+      ctx.beginPath();
+      ctx.moveTo(tx, headY + jh * 0.9);
+      ctx.lineTo(tx + 2, headY + jh * 0.9);
+      ctx.lineTo(tx + 1, headY + jh * 0.9 + jh * 0.5);
+      ctx.closePath(); ctx.fill();
+    }
+  }
+  // eye
+  ctx.fillStyle = d.o ? '#1b1b1b' : (def.behavior === 'aggressive' ? '#e33' : '#1b1b1b');
+  ctx.beginPath(); ctx.arc(headX + W * 0.02, headY - H * 0.02, Math.max(2, H * 0.03), 0, 7); ctx.fill();
+}
+
+// Dodo keeps its round-bird look; everything else is a theropod.
+function drawDodo(ctx, d, def, h, br, t) {
   const hue = 25 + hash01(h) * 30;
   const light = 32 + hash01(h * 3) * 14;
   const body = `hsl(${hue}, 32%, ${light * (0.4 + br * 0.6)}%)`;
   const belly = `hsl(${hue}, 30%, ${(light + 14) * (0.4 + br * 0.6)}%)`;
-
-  const cx = x + def.w / 2;
-  const base = y + def.h;
   const moving = d.s === 'walk' || d.s === 'flee' || d.s === 'follow';
   const waddle = moving ? Math.sin(t * (d.s === 'flee' ? 0.03 : 0.015) + h) : 0;
 
-  ctx.save();
-  ctx.translate(cx, base + Math.abs(waddle) * -2);
-  ctx.scale(d.f < 0 ? -1 : 1, 1);
-
-  // legs
   ctx.strokeStyle = shade(214, 160, 66, br);
-  ctx.lineWidth = 4;
-  ctx.lineCap = 'round';
+  ctx.lineWidth = 4; ctx.lineCap = 'round';
   ctx.beginPath();
   ctx.moveTo(-8, -14); ctx.lineTo(-8 + waddle * 6, 0);
   ctx.moveTo(8, -14); ctx.lineTo(8 - waddle * 6, 0);
   ctx.stroke();
-
-  // body + belly + tail puff
   ctx.fillStyle = body;
   ctx.beginPath(); ctx.ellipse(0, -26, 24, 17, 0, 0, 7); ctx.fill();
   ctx.fillStyle = belly;
   ctx.beginPath(); ctx.ellipse(-2, -22, 15, 10, 0, 0, 7); ctx.fill();
   ctx.fillStyle = body;
-  ctx.beginPath();
-  ctx.arc(-22, -32, 6, 0, 7);
-  ctx.arc(-26, -27, 5, 0, 7);
-  ctx.fill();
-
-  // wing
+  ctx.beginPath(); ctx.arc(-22, -32, 6, 0, 7); ctx.arc(-26, -27, 5, 0, 7); ctx.fill();
   ctx.fillStyle = `hsl(${hue}, 30%, ${(light - 8) * (0.4 + br * 0.6)}%)`;
   ctx.beginPath(); ctx.ellipse(-4, -27, 10, 6, -0.3, 0, 7); ctx.fill();
-
-  // neck + head
   ctx.fillStyle = body;
   ctx.beginPath(); ctx.ellipse(16, -40, 8, 10, 0.2, 0, 7); ctx.fill();
   ctx.beginPath(); ctx.arc(20, -48, 9, 0, 7); ctx.fill();
-  // beak
   ctx.fillStyle = shade(235, 172, 70, br);
-  ctx.beginPath();
-  ctx.moveTo(26, -52); ctx.lineTo(42, -47); ctx.lineTo(26, -43);
-  ctx.closePath(); ctx.fill();
-  // eye
+  ctx.beginPath(); ctx.moveTo(26, -52); ctx.lineTo(42, -47); ctx.lineTo(26, -43); ctx.closePath(); ctx.fill();
   ctx.fillStyle = '#1b1b1b';
   ctx.beginPath(); ctx.arc(21, -50, 2.2, 0, 7); ctx.fill();
+}
 
+// d: dino wire {i, x, y, f, s, tm, o, h, nm, sp, r} at interpolated pos
+export function drawDino(ctx, x, y, d, br, t) {
+  const def = DINODEFS[d.sp || 'dodo'];
+  const h = typeof d.i === 'string' ? nameHash(d.i) : d.i;
+  const cx = x + def.w / 2;
+  const base = y + def.h;
+
+  ctx.save();
+  ctx.translate(cx, base);
+  ctx.scale(d.f < 0 ? -1 : 1, 1);
+  if (d.sp === 'dodo' || !d.sp) drawDodo(ctx, d, def, h, br, t);
+  else drawTheropod(ctx, d, def, LOOK[d.sp] || LOOK.compy, h, br, t);
   ctx.restore();
 
   // labels: taming progress or owner tag
@@ -187,10 +303,22 @@ export function drawDino(ctx, x, y, d, br, t) {
     ctx.textAlign = 'center';
     ctx.fillText('taming…', cx, y - 17);
   }
-  if (d.h !== undefined && d.h < def.hp && !d.o) {
-    ctx.fillStyle = 'rgba(0,0,0,0.55)';
-    ctx.fillRect(cx - 20, y - 4, 40, 4);
-    ctx.fillStyle = '#e05a4e';
-    ctx.fillRect(cx - 20, y - 4, 40 * (d.h / def.hp), 4);
+  if (!d.o) {
+    // threat-colored name for wild dinos so a rex reads differently than a compy
+    const THREAT = ['#a7d8a0', '#e6d27a', '#e8a24e', '#e8663e', '#ff3b3b'];
+    if ((def.threat || 0) >= 1) {
+      ctx.font = `${def.threat >= 3 ? '700' : '600'} 11px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx.fillText(def.name, cx + 1, y - 7);
+      ctx.fillStyle = THREAT[def.threat] || '#fff';
+      ctx.fillText(def.threat >= 4 ? `⚠ ${def.name} ⚠` : def.name, cx, y - 8);
+    }
+    if (d.h !== undefined && d.h < def.hp) {
+      ctx.fillStyle = 'rgba(0,0,0,0.55)';
+      ctx.fillRect(cx - 22, y - 4, 44, 4);
+      ctx.fillStyle = '#e05a4e';
+      ctx.fillRect(cx - 22, y - 4, 44 * (d.h / def.hp), 4);
+    }
   }
 }

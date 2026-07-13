@@ -108,18 +108,29 @@ function contextHint(ctx, W) {
     if (s && s.kind === 'storage_box') bits.push('E open box');
     const own = findNearestStructure(INTERACT_RANGE + 30);
     if (own && own.owner === state.name) bits.push('X demolish');
-    const wild = findNearestDino(INTERACT_RANGE + 30, (d) => !d.o);
-    if (wild) {
-      const def = DINODEFS[wild.sp || 'dodo'];
-      const fed = Math.round((wild.tm || 0) * def.tameFeeds);
-      if ((state.me.inv[def.tameFood] || 0) > 0) {
-        bits.push(`E feed ${def.tameFood === 'berry' ? 'berries' : def.tameFood} (${fed}/${def.tameFeeds})`);
-      } else if (wild.tm > 0) {
-        bits.push(`need ${def.tameFood === 'berry' ? 'berries' : def.tameFood} to keep taming!`);
+    if (state.me.mounted) {
+      bits.push('A/D move · Space jump · R dismount');
+    } else {
+      const wild = findNearestDino(INTERACT_RANGE + 30, (d) => !d.o);
+      if (wild) {
+        const def = DINODEFS[wild.sp || 'dodo'];
+        if (def.tame) {
+          const food = def.tame.food;
+          const fed = Math.round((wild.tm || 0) * def.tame.feeds);
+          if ((state.me.inv[food] || 0) > 0) {
+            bits.push(`E feed ${food === 'berry' ? 'berries' : food} (${fed}/${def.tame.feeds})`);
+          } else if (wild.tm > 0) {
+            bits.push(`need ${food === 'berry' ? 'berries' : food} to keep taming!`);
+          }
+        }
+        if ((def.threat || 0) >= 1) bits.push(`click/F attack ${def.name}`);
+      }
+      const tame = findNearestDino(240, (d) => d.o === state.name);
+      if (tame) {
+        bits.push(`T ${tame.s === 'stay' ? 'follow me' : 'stay'}`);
+        if (DINODEFS[tame.sp] && DINODEFS[tame.sp].rideable) bits.push('R ride');
       }
     }
-    const tame = findNearestDino(220, (d) => d.o === state.name);
-    if (tame) bits.push(`T ${tame.s === 'stay' ? 'follow me' : 'stay'}`);
     hint = bits.join('  ·  ');
   }
   if (!hint) return;

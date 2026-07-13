@@ -4,24 +4,29 @@
 import { ITEMS, isItem } from '../shared/items.js';
 import { RECIPES } from '../shared/recipes.js';
 import {
-  WORLD_W, GROUND_Y, PLAYER_W, PLAYER_H, CHAT_MAX, STATS_MAX,
+  WORLD_W, PLAYER_W, CHAT_MAX, STATS_MAX,
 } from '../shared/const.js';
 import { toast, sendInv, sendStats, broadcast } from './net.js';
 import { invAdd, invRemove, invCount, invPayCost } from './inventory.js';
 import { harvest } from './harvest.js';
 import { build, demolish } from './building.js';
 import { use } from './interact.js';
-import { attack, feed, dinoCmd } from './dinos.js';
+import { attack, feed, dinoCmd, setRideInput } from './dinos.js';
 
 const ANIMS = new Set(['idle', 'walk', 'jump', 'swing']);
 const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
 
 const HANDLERS = {
   input(p, m) {
+    if (p.mount) {
+      // Mounted: the server drives the rider's position; only steer the mount.
+      setRideInput(p, m.ride === -1 ? -1 : m.ride === 1 ? 1 : 0, !!m.rj);
+      return;
+    }
     const x = Number(m.x), y = Number(m.y);
     if (Number.isFinite(x)) p.x = clamp(x, 0, WORLD_W - PLAYER_W);
-    if (Number.isFinite(y)) p.y = clamp(y, -1200, GROUND_Y - PLAYER_H);
-    p.vx = clamp(Number(m.vx) || 0, -500, 500);
+    if (Number.isFinite(y)) p.y = clamp(y, -1200, 720); // terrain valleys reach ~606
+    p.vx = clamp(Number(m.vx) || 0, -520, 520);
     p.face = m.f === -1 ? -1 : 1;
     p.anim = ANIMS.has(m.a) ? m.a : 'idle';
   },

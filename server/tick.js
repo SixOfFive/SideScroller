@@ -13,13 +13,24 @@ import { updateDinos, wireDinos } from './dinos.js';
 let tickCount = 0;
 
 function respawn(p) {
+  if (p.mount) { // drop the rider off their mount on death
+    const mount = world.dinos.get(p.mount);
+    if (mount) mount.rider = null;
+    p.mount = null;
+    send(p, { t: 'dismount' });
+  }
+  const cause = p.deathCause || 'the wilds';
+  p.deathCause = null;
   p.hp = STATS_MAX;
-  p.hunger = 60;
+  p.hunger = Math.max(p.hunger, 55);
   p.x = SPAWN_X + Math.random() * 100;
   p.y = groundAt(p.x + 14) - PLAYER_H;
   send(p, { t: 'dead', x: p.x, y: p.y });
   sendStats(p);
-  broadcast({ t: 'chat', from: '', text: `${p.name} starved and washed back up at the beach.` });
+  const msg = cause === 'starved'
+    ? `${p.name} starved and washed back up at the beach.`
+    : `${p.name} was killed by ${cause === 'the wilds' ? 'the wilds' : 'a ' + cause} and washed back up at the beach.`;
+  broadcast({ t: 'chat', from: '', text: msg });
 }
 
 function step() {
@@ -27,10 +38,12 @@ function step() {
   const now = Date.now();
   world.time += dt;
 
+  const settings = world.settings;
   for (const p of world.players.values()) {
-    p.hunger = Math.max(0, p.hunger - HUNGER_DRAIN_PS * dt);
-    if (p.hunger <= 0) {
+    if (settings.hunger) p.hunger = Math.max(0, p.hunger - HUNGER_DRAIN_PS * dt);
+    if (settings.hunger && p.hunger <= 0) {
       p.hp -= STARVE_HP_PS * dt;
+      p.deathCause = 'starved';
     } else if (p.hunger > REGEN_HUNGER_MIN && p.hp < STATS_MAX) {
       p.hp = Math.min(STATS_MAX, p.hp + REGEN_HP_PS * dt);
     }

@@ -14,7 +14,11 @@ export const world = {
   profiles: Object.create(null),
   time: 60,              // world clock in seconds (day cycle uses modulo)
   nextId: 1,
+  // World-wide rules, adjustable from the ESC options menu.
+  settings: { hunger: true, thirst: true, damage: true, dayLen: 480 },
 };
+
+export const DEFAULT_SETTINGS = { hunger: true, thirst: true, damage: true, dayLen: 480 };
 
 export function newId(prefix) {
   return prefix + world.nextId++;
@@ -61,6 +65,7 @@ export function saveWorld() {
     structures: [...world.structures.values()],
     dinos: [...world.dinos.values()],
     profiles: world.profiles,
+    settings: world.settings,
   };
   try {
     if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
@@ -83,6 +88,7 @@ export function loadWorld() {
     }
     world.time = data.time || 60;
     world.nextId = data.nextId || 1;
+    world.settings = Object.assign({ ...DEFAULT_SETTINGS }, data.settings || {});
     world.profiles = Object.assign(Object.create(null), data.profiles || {});
     for (const n of data.nodes || []) world.nodes.set(n.id, n);
     for (const s of data.structures || []) world.structures.set(s.id, s);

@@ -29,7 +29,10 @@ export function send(p, msg) { sendRaw(p.ws, msg); }
 export function toast(p, msg) { send(p, { t: 'toast', msg }); }
 export function sendInv(p) { send(p, { t: 'inv', inv: p.inv, equip: p.equip }); }
 export function sendStats(p) {
-  send(p, { t: 'stats', hp: Math.round(p.hp), hunger: Math.round(p.hunger) });
+  send(p, {
+    t: 'stats', hp: Math.round(p.hp), hunger: Math.round(p.hunger),
+    thirst: Math.round(p.thirst ?? 100),
+  });
 }
 
 export function broadcast(msg, exceptId = null) {
@@ -86,8 +89,10 @@ function doJoin(ws, msg) {
     vx: 0, face: 1, anim: 'idle',
     hp: Number.isFinite(prof?.stats?.hp) ? prof.stats.hp : STATS_MAX,
     hunger: Number.isFinite(prof?.stats?.hunger) ? prof.stats.hunger : STATS_MAX,
+    thirst: Number.isFinite(prof?.stats?.thirst) ? prof.stats.thirst : STATS_MAX,
     inv: prof && prof.inv && typeof prof.inv === 'object' ? prof.inv : {},
     equip: typeof prof?.equip === 'string' ? prof.equip : '',
+    mount: null, rideDir: 0, rideJump: false, deathCause: null,
     lastSwing: 0, lastChat: 0, lastStatSig: '',
   };
   world.players.set(p.id, p);
@@ -95,11 +100,15 @@ function doJoin(ws, msg) {
   send(p, {
     t: 'welcome',
     id: p.id, name: p.name, worldW: WORLD_W, time: world.time,
+    settings: world.settings,
     nodes: [...world.nodes.values()],
     structures: [...world.structures.values()],
     dinos: wireDinos(),
     players: [...world.players.values()].filter((o) => o.id !== p.id).map(wirePlayer),
-    you: { x: p.x, y: p.y, inv: p.inv, stats: { hp: p.hp, hunger: p.hunger }, equip: p.equip },
+    you: {
+      x: p.x, y: p.y, inv: p.inv, equip: p.equip,
+      stats: { hp: p.hp, hunger: p.hunger, thirst: p.thirst },
+    },
   });
   broadcast({ t: 'pjoin', p: wirePlayer(p) }, p.id);
   broadcast({ t: 'chat', from: '', text: `${p.name} washed up on the beach.` });

@@ -20,8 +20,12 @@ export const state = {
   dinos: new Map(),
   me: {
     x: 0, y: 0, vx: 0, vy: 0, grounded: true, face: 1, anim: 'idle',
-    swingT: 0, hp: 100, hunger: 100, inv: {}, equip: '',
+    swingT: 0, hp: 100, hunger: 100, thirst: 100, inv: {}, equip: '',
+    speedMul: 1, inWater: false,
+    mounted: false, mountId: null,
+    hurtT: 0, shake: 0,     // damage flash + screen-shake timers
   },
+  settings: { hunger: true, thirst: true, damage: true, dayLen: 480 },
   build: null,            // active build kind while in build mode
   hoverNode: null,
 };
@@ -128,8 +132,11 @@ on('welcome', (m) => {
   Object.assign(state.me, {
     x: m.you.x, y: m.you.y, vx: 0, vy: 0,
     hp: m.you.stats.hp, hunger: m.you.stats.hunger,
+    thirst: m.you.stats.thirst ?? 100,
     inv: m.you.inv, equip: m.you.equip,
+    mounted: false, mountId: null,
   });
+  if (m.settings) state.settings = m.settings;
   state.joined = true;
 });
 
@@ -174,11 +181,33 @@ on('supd', (m) => {
 on('srem', (m) => state.structures.delete(m.id));
 
 on('inv', (m) => { state.me.inv = m.inv; state.me.equip = m.equip; });
-on('stats', (m) => { state.me.hp = m.hp; state.me.hunger = m.hunger; });
+on('stats', (m) => {
+  state.me.hp = m.hp;
+  state.me.hunger = m.hunger;
+  if (m.thirst !== undefined) state.me.thirst = m.thirst;
+});
+on('settings', (m) => { state.settings = m.settings; });
+
+on('hurt', (m) => {
+  // knockback + red flash + screen shake; damage number floats in fx.js
+  if (!state.me.mounted) {
+    state.me.vx = m.kx || 0;
+    state.me.vy = Math.min(state.me.vy, -240);
+    state.me.grounded = false;
+  }
+  state.me.hurtT = 0.35;
+  state.me.shake = Math.min(1, (state.me.shake || 0) + 0.6);
+});
+
+on('mount', (m) => { state.me.mounted = true; state.me.mountId = m.dino; });
+on('dismount', () => { state.me.mounted = false; state.me.mountId = null; state.me.vy = 0; });
 
 on('dead', (m) => {
   state.me.x = m.x;
   state.me.y = m.y;
   state.me.vx = 0;
   state.me.vy = 0;
+  state.me.mounted = false;
+  state.me.mountId = null;
+  state.me.shake = 1;
 });
