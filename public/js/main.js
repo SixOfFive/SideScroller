@@ -162,6 +162,8 @@ function frame(now) {
     processActions();
     updateHover();
     render(dt);
+  } else {
+    popActions(); // don't let pre-join/post-disconnect keypresses replay later
   }
   requestAnimationFrame(frame);
 }

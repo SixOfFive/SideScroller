@@ -8,7 +8,10 @@ export const world = {
   structures: new Map(), // id -> {id, kind, x, y, owner, lit?, fuelS?, inv?}
   dinos: new Map(),      // id -> dino (stage 2)
   players: new Map(),    // id -> live connected player (not saved directly)
-  profiles: {},          // lower-case name -> {name, x, y, inv, stats, equip}
+  // lower-case name -> {name, x, y, inv, stats, equip, tokenHash, lastSeen}.
+  // Null prototype: names like '__proto__' or 'constructor' must be plain keys,
+  // never prototype accessors.
+  profiles: Object.create(null),
   time: 60,              // world clock in seconds (day cycle uses modulo)
   nextId: 1,
 };
@@ -71,7 +74,7 @@ export function loadWorld() {
     const data = JSON.parse(readFileSync(SAVE_PATH, 'utf8'));
     world.time = data.time || 60;
     world.nextId = data.nextId || 1;
-    world.profiles = data.profiles || {};
+    world.profiles = Object.assign(Object.create(null), data.profiles || {});
     for (const n of data.nodes || []) world.nodes.set(n.id, n);
     for (const s of data.structures || []) world.structures.set(s.id, s);
     for (const d of data.dinos || []) world.dinos.set(d.id, d);

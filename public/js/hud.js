@@ -83,7 +83,7 @@ function clock(ctx, W) {
   const mins = Math.floor(phase * 24 * 60);
   const hh = String(Math.floor(mins / 60)).padStart(2, '0');
   const mm = String(mins % 60).padStart(2, '0');
-  const icon = phase < 0.66 || phase > 0.96 ? '☀' : '☾';
+  const icon = phase < 0.7 ? '☀' : '☾'; // matches when r_bg swaps sun for moon
   ctx.font = 'bold 14px sans-serif';
   ctx.textAlign = 'right';
   ctx.fillStyle = 'rgba(8,11,20,0.6)';

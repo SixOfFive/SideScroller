@@ -40,7 +40,8 @@ const HANDLERS = {
     if (!def || !def.food) return;
     if (!invRemove(p.inv, m.item, 1)) { toast(p, 'None left'); return; }
     p.hunger = clamp(p.hunger + def.food.hunger, 0, STATS_MAX);
-    p.hp = clamp(p.hp + def.food.hp, 1, STATS_MAX); // food never kills outright
+    // Food never kills outright, but the floor must not heal a dying player.
+    p.hp = clamp(p.hp + def.food.hp, Math.min(p.hp, 1), STATS_MAX);
     sendInv(p);
     sendStats(p);
   },

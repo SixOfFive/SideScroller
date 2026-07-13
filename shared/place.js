@@ -27,6 +27,9 @@ function overlaps(structures, x, y, w, h) {
 
 // Returns {ok, x, y, reason}. x/y are the snapped top-left placement position.
 export function computePlacement(kind, wantX, structures) {
+  // Callers pass Map iterators; materialize so repeated atCol/overlaps scans
+  // all see the full set (a one-shot iterator is empty after the first pass).
+  structures = Array.isArray(structures) ? structures : [...structures];
   const def = STRUCTURES[kind];
   if (!def) return { ok: false, reason: 'Unknown structure' };
 
