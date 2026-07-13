@@ -10,7 +10,7 @@ import { cam, screenToWorldX } from './camera.js';
 import { initRender, render } from './render.js';
 import {
   initUI, toast, toggleInv, toggleHelp, toggleBuildBar, cancelBuild,
-  openStorage, closeAllPanels,
+  openStorage, closeAllPanels, toggleOptions, isPanelOpen,
 } from './ui.js';
 import { initChat, focusChat } from './chat.js';
 import { initSound, toggleMute, sfx } from './sound.js';
@@ -94,6 +94,8 @@ function doInteract() {
   // portals take priority when you're standing in one
   const portal = findNearestStructure(INTERACT_RANGE, ['portal']);
   if (portal) { sendMsg({ t: 'use', id: portal.id, action: 'enter' }); return; }
+  // standing in a stream: drink
+  if (state.me.inWater) { sendMsg({ t: 'drink' }); return; }
 
   const s = findNearestStructure(INTERACT_RANGE + 30, ['storage_box', 'campfire', 'forge']);
   const d = findNearestDino(INTERACT_RANGE + 30, (dd) => !dd.o);
@@ -159,7 +161,8 @@ function processActions() {
       case 'chat': focusChat(); break;
       case 'escape':
         if (state.build) cancelBuild();
-        else closeAllPanels();
+        else if (isPanelOpen()) closeAllPanels();
+        else toggleOptions(); // nothing open: ESC is the pause/options menu
         break;
       case 'equip1': case 'equip2': case 'equip3': case 'equip4':
         sendMsg({ t: 'equip', item: EQUIP_SLOTS[a.type] });

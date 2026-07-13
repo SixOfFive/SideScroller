@@ -123,6 +123,7 @@ export function initSound() {
   on('hurt', () => sfx('hurt'));
   on('dead', () => sfx('death'));
   on('tp', () => sfx('portal'));
+  on('drank', () => sfx('drink'));
   on('sadd', (m) => sfx('build', m.s.x));
   on('srem', () => sfx('crumble', state.me.x));
 

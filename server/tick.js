@@ -3,8 +3,9 @@
 
 import { world } from './state.js';
 import {
-  TICK_HZ, SNAP_HZ, NODE_RESPAWN_MS, STATS_MAX, SPAWN_X, GROUND_Y, PLAYER_H,
-  HUNGER_DRAIN_PS, STARVE_HP_PS, REGEN_HP_PS, REGEN_HUNGER_MIN,
+  TICK_HZ, SNAP_HZ, NODE_RESPAWN_MS, STATS_MAX, SPAWN_X, PLAYER_H,
+  HUNGER_DRAIN_PS, THIRST_DRAIN_PS, STARVE_HP_PS,
+  REGEN_HP_PS, REGEN_HUNGER_MIN, REGEN_THIRST_MIN,
 } from '../shared/const.js';
 import { groundAt } from '../shared/terrain.js';
 import { send, sendStats, broadcast, wirePlayer } from './net.js';
@@ -24,12 +25,13 @@ function respawn(p) {
   p.deathCause = null;
   p.hp = STATS_MAX;
   p.hunger = Math.max(p.hunger, 55);
+  p.thirst = Math.max(p.thirst ?? STATS_MAX, 55);
   p.x = SPAWN_X + Math.random() * 100;
   p.y = groundAt(p.x + 14) - PLAYER_H;
   send(p, { t: 'dead', x: p.x, y: p.y });
   sendStats(p);
-  const msg = cause === 'starved'
-    ? `${p.name} starved and washed back up at the beach.`
+  const msg = cause === 'starved' ? `${p.name} starved and washed back up at the beach.`
+    : cause === 'dehydration' ? `${p.name} died of thirst and washed back up at the beach.`
     : `${p.name} was killed by ${cause === 'the wilds' ? 'the wilds' : 'a ' + cause} and washed back up at the beach.`;
   broadcast({ t: 'chat', from: '', text: msg });
 }
@@ -55,15 +57,21 @@ function step() {
       respawn(p);
     } else {
       if (settings.hunger) p.hunger = Math.max(0, p.hunger - HUNGER_DRAIN_PS * dt);
-      if (settings.hunger && p.hunger <= 0) {
-        p.hp -= STARVE_HP_PS * dt;
-        if (p.hp <= 0) { p.deathCause = 'starved'; respawn(p); }
-      } else if (p.hunger > REGEN_HUNGER_MIN && p.hp < STATS_MAX) {
+      if (settings.thirst) p.thirst = Math.max(0, (p.thirst ?? STATS_MAX) - THIRST_DRAIN_PS * dt);
+
+      const starving = settings.hunger && p.hunger <= 0;
+      const parched = settings.thirst && p.thirst <= 0;
+      if (starving || parched) {
+        p.hp -= STARVE_HP_PS * dt * (starving && parched ? 2 : 1);
+        if (p.hp <= 0) { p.deathCause = parched ? 'dehydration' : 'starved'; respawn(p); }
+      } else if (p.hunger > REGEN_HUNGER_MIN
+          && (!settings.thirst || p.thirst > REGEN_THIRST_MIN)
+          && p.hp < STATS_MAX) {
         p.hp = Math.min(STATS_MAX, p.hp + REGEN_HP_PS * dt);
       }
     }
 
-    const sig = `${Math.round(p.hp)}:${Math.round(p.hunger)}`;
+    const sig = `${Math.round(p.hp)}:${Math.round(p.hunger)}:${Math.round(p.thirst ?? 100)}`;
     if (sig !== p.lastStatSig) {
       p.lastStatSig = sig;
       sendStats(p);

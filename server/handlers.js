@@ -4,8 +4,10 @@
 import { ITEMS, isItem, isArmor } from '../shared/items.js';
 import { RECIPES } from '../shared/recipes.js';
 import {
-  WORLD_W, PLAYER_W, CHAT_MAX, STATS_MAX,
+  WORLD_W, PLAYER_W, PLAYER_H, CHAT_MAX, STATS_MAX, DRINK_AMOUNT,
 } from '../shared/const.js';
+import { inWater } from '../shared/terrain.js';
+import { world } from './state.js';
 import { toast, sendInv, sendStats, broadcast } from './net.js';
 import { invAdd, invRemove, invCount, invPayCost } from './inventory.js';
 import { harvest } from './harvest.js';
@@ -47,10 +49,21 @@ const HANDLERS = {
     if (!def || !def.food) return;
     if (!invRemove(p.inv, m.item, 1)) { toast(p, 'None left'); return; }
     p.hunger = clamp(p.hunger + def.food.hunger, 0, STATS_MAX);
+    if (def.food.thirst) p.thirst = clamp((p.thirst ?? STATS_MAX) + def.food.thirst, 0, STATS_MAX);
     // Food never kills outright, but the floor must not heal a dying player.
     p.hp = clamp(p.hp + def.food.hp, Math.min(p.hp, 1), STATS_MAX);
     sendInv(p);
     sendStats(p);
+  },
+
+  drink(p) {
+    if (!inWater(p.x + PLAYER_W / 2, p.y + PLAYER_H)) {
+      toast(p, 'You need to stand in a stream to drink');
+      return;
+    }
+    p.thirst = clamp((p.thirst ?? STATS_MAX) + DRINK_AMOUNT, 0, STATS_MAX);
+    sendStats(p);
+    send(p, { t: 'drank' });
   },
 
   craft(p, m) {
@@ -88,6 +101,17 @@ const HANDLERS = {
     invAdd(p.inv, p.armorSet[slot], 1);
     p.armorSet[slot] = '';
     sendInv(p);
+  },
+
+  // World settings from the ESC menu — co-op style, any survivor may adjust.
+  setSettings(p, m) {
+    const s = world.settings;
+    if (typeof m.hunger === 'boolean') s.hunger = m.hunger;
+    if (typeof m.thirst === 'boolean') s.thirst = m.thirst;
+    if (typeof m.damage === 'boolean') s.damage = m.damage;
+    if ([240, 480, 960].includes(m.dayLen)) s.dayLen = m.dayLen;
+    broadcast({ t: 'settings', settings: s });
+    broadcast({ t: 'chat', from: '', text: `${p.name} changed the world settings.` });
   },
 
   harvest, build, demolish, use, attack, feed, dinoCmd, shoot,

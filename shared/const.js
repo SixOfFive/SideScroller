@@ -31,6 +31,9 @@ export const CHAT_MAX = 140;
 
 export const STATS_MAX = 100;
 export const HUNGER_DRAIN_PS = 1 / 12;   // hunger per second
-export const STARVE_HP_PS = 1 / 3;       // hp lost per second at 0 hunger
-export const REGEN_HP_PS = 0.25;         // hp per second when hunger > 40
+export const THIRST_DRAIN_PS = 1 / 9;    // thirst drains a bit faster than hunger
+export const STARVE_HP_PS = 1 / 3;       // hp lost per second at 0 hunger/thirst
+export const REGEN_HP_PS = 0.25;         // hp per second when fed + watered
 export const REGEN_HUNGER_MIN = 40;
+export const REGEN_THIRST_MIN = 25;
+export const DRINK_AMOUNT = 45;          // thirst restored per stream drink

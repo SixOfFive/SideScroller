@@ -2,7 +2,7 @@
 
 import { on, sendMsg } from './net.js';
 import { state } from './state.js';
-import { sfx } from './sound.js';
+import { sfx, toggleMute } from './sound.js';
 import { ITEMS, itemName, isArmor } from '/shared/items.js';
 import { RECIPES, CRAFTABLES, BUILDABLES } from '/shared/recipes.js';
 
@@ -228,7 +228,8 @@ const HELP_HTML = `
 <p><span class="kbd">A</span>/<span class="kbd">D</span> move · <span class="kbd">Space</span> jump · <span class="kbd">click</span>/<span class="kbd">F</span> harvest &amp; attack</p>
 <p><span class="kbd">1</span>–<span class="kbd">4</span> tools · <span class="kbd">Tab</span> inventory &amp; crafting · <span class="kbd">Q</span> build bar · <span class="kbd">G</span> quick-eat</p>
 <p><span class="kbd">E</span> interact (light campfire / open box / feed dodo) · <span class="kbd">C</span> cook meat · <span class="kbd">X</span> demolish · <span class="kbd">T</span> dodo follow/stay</p>
-<p><span class="kbd">R</span> ride a tamed parasaur · <span class="kbd">M</span> mute sounds · <span class="kbd">Enter</span> chat · <span class="kbd">H</span> close this help</p>
+<p><span class="kbd">R</span> ride a tamed parasaur · <span class="kbd">M</span> mute sounds · <span class="kbd">Enter</span> chat · <span class="kbd">Esc</span> options/quit · <span class="kbd">H</span> close this help</p>
+<p>Keep an eye on your <b>water bar</b> — drink from streams (<span class="kbd">E</span> while standing in one) or eat berries.</p>
 <h3>The loop</h3>
 <p>Punch trees for thatch and wood, grab stones off the ground. Craft a Stone Axe
 and Pick — better tools mean way more resources per swing, just like ARK.</p>
@@ -246,9 +247,77 @@ export function toggleHelp() {
   if (!p.innerHTML) p.innerHTML = HELP_HTML;
 }
 
+// --- ESC options menu -------------------------------------------------------
+
+function settingRow(label, key, hint) {
+  const row = el('div', 'itemrow');
+  const cb = el('input');
+  cb.type = 'checkbox';
+  cb.checked = !!state.settings[key];
+  cb.onchange = () => sendMsg({ t: 'setSettings', [key]: cb.checked });
+  const lbl = el('span', 'nm', label);
+  row.append(cb, lbl);
+  if (hint) row.append(el('span', 'cost', hint));
+  return row;
+}
+
+function refreshOptions() {
+  const panel = $('optionsPanel');
+  if (panel.classList.contains('hidden')) return;
+  panel.replaceChildren();
+  panel.append(el('h2', '', 'Options'));
+  panel.append(el('h3', '', 'World rules — shared by every survivor'));
+  panel.append(settingRow('Hunger drain', 'hunger', 'off = food bar never drops'));
+  panel.append(settingRow('Thirst drain', 'thirst', 'off = water bar never drops'));
+  panel.append(settingRow('Dino damage', 'damage', 'off = wildlife can\'t hurt you'));
+
+  const dayRow = el('div', 'itemrow');
+  dayRow.append(el('span', 'nm', 'Day length'));
+  const sel = el('select');
+  for (const [v, label] of [[240, 'Fast (4 min)'], [480, 'Normal (8 min)'], [960, 'Long (16 min)']]) {
+    const o = el('option', '', label);
+    o.value = v;
+    if (state.settings.dayLen === v) o.selected = true;
+    sel.append(o);
+  }
+  sel.onchange = () => sendMsg({ t: 'setSettings', dayLen: Number(sel.value) });
+  dayRow.append(sel);
+  panel.append(dayRow);
+
+  panel.append(el('h3', '', 'Local'));
+  const muteRow = el('div', 'itemrow');
+  const mcb = el('input');
+  mcb.type = 'checkbox';
+  mcb.checked = localStorage.getItem('ss_mute') === '1';
+  mcb.onchange = () => toggleMute();
+  muteRow.append(mcb, el('span', 'nm', 'Mute sounds (M)'));
+  panel.append(muteRow);
+
+  const btnRow = el('div', 'itemrow');
+  const resume = el('button', '', 'Resume (Esc)');
+  resume.onclick = () => toggleOptions();
+  const quit = el('button', '', 'Quit to title');
+  quit.onclick = () => location.reload();
+  btnRow.append(resume, quit);
+  panel.append(btnRow);
+}
+
+export function toggleOptions() {
+  const p = $('optionsPanel');
+  p.classList.toggle('hidden');
+  refreshOptions();
+}
+
+export function isPanelOpen() {
+  return ['invPanel', 'storagePanel', 'helpPanel', 'optionsPanel']
+    .some((id) => !$(id).classList.contains('hidden'))
+    || !$('buildBar').classList.contains('hidden');
+}
+
 export function closeAllPanels() {
   $('invPanel').classList.add('hidden');
   $('helpPanel').classList.add('hidden');
+  $('optionsPanel').classList.add('hidden');
   closeStorage();
   cancelBuild();
 }
@@ -257,6 +326,7 @@ export function closeAllPanels() {
 
 export function initUI() {
   on('toast', (m) => toast(m.msg));
+  on('settings', () => refreshOptions());
   on('inv', () => { refreshInv(); refreshStorage(); refreshBuildBar(); });
   on('supd', (m) => { if (m.s.id === storageOpenId) refreshStorage(); });
   on('srem', (m) => { if (m.id === storageOpenId) closeStorage(); });

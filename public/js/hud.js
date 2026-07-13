@@ -32,15 +32,25 @@ function bar(ctx, x, y, w, h, frac, color, label) {
 }
 
 function vitals(ctx) {
-  const y = VIEW_H - 66;
+  const y = VIEW_H - 88;
   bar(ctx, 16, y, 190, 16, state.me.hp / 100, state.me.hp > 30 ? '#c0392b' : '#ff5d4e',
     `HP ${Math.round(state.me.hp)}`);
-  bar(ctx, 16, y + 24, 190, 16, state.me.hunger / 100,
+  bar(ctx, 16, y + 23, 190, 16, state.me.hunger / 100,
     state.me.hunger > 25 ? '#d68a2e' : '#ff8c4e', `FOOD ${Math.round(state.me.hunger)}`);
-  if (state.me.hunger <= 20) {
+  if (state.settings.thirst) {
+    bar(ctx, 16, y + 46, 190, 16, state.me.thirst / 100,
+      state.me.thirst > 25 ? '#3a7bc9' : '#5aa2f0', `WATER ${Math.round(state.me.thirst)}`);
+  }
+  let warn = '';
+  if (state.me.hunger <= 0) warn = 'STARVING!';
+  else if (state.settings.thirst && state.me.thirst <= 0) warn = 'DYING OF THIRST!';
+  else if (state.me.hunger <= 20) warn = 'Hungry — eat something (G)';
+  else if (state.settings.thirst && state.me.thirst <= 20) warn = 'Thirsty — drink at a stream or eat berries';
+  if (warn) {
     ctx.font = 'bold 12px sans-serif';
+    ctx.textAlign = 'left';
     ctx.fillStyle = `rgba(255,120,90,${0.6 + 0.4 * Math.sin(performance.now() * 0.008)})`;
-    ctx.fillText(state.me.hunger <= 0 ? 'STARVING!' : 'Hungry — eat something (G)', 16, y - 8);
+    ctx.fillText(warn, 16, y - 8);
   }
 }
 
@@ -101,6 +111,7 @@ function contextHint(ctx, W) {
     const bits = [];
     const portal = findNearestStructure(INTERACT_RANGE, ['portal']);
     if (portal) bits.push(`E enter ${portal.label} portal`);
+    else if (state.me.inWater) bits.push('E drink');
     const s = findNearestStructure(INTERACT_RANGE + 30, ['campfire', 'storage_box']);
     if (s && s.kind === 'campfire') {
       const left = Math.max(0,

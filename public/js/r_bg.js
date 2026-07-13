@@ -1,9 +1,11 @@
 // Sky, sun/moon, stars, parallax mountains and clouds, day/night cycle.
 
 import { DAY_LENGTH_S } from '/shared/const.js';
+import { state } from './state.js';
 
 export function dayPhase(worldTime) {
-  return (worldTime % DAY_LENGTH_S) / DAY_LENGTH_S;
+  const len = (state.settings && state.settings.dayLen) || DAY_LENGTH_S;
+  return (worldTime % len) / len;
 }
 
 // 1 = full day, ~0.22 = deep night, smooth dusk/dawn ramps.
