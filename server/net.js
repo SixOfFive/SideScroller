@@ -27,7 +27,9 @@ function sendRaw(ws, msg) {
 
 export function send(p, msg) { sendRaw(p.ws, msg); }
 export function toast(p, msg) { send(p, { t: 'toast', msg }); }
-export function sendInv(p) { send(p, { t: 'inv', inv: p.inv, equip: p.equip }); }
+export function sendInv(p) {
+  send(p, { t: 'inv', inv: p.inv, equip: p.equip, armor: p.armorSet });
+}
 export function sendStats(p) {
   send(p, {
     t: 'stats', hp: Math.round(p.hp), hunger: Math.round(p.hunger),
@@ -42,11 +44,19 @@ export function broadcast(msg, exceptId = null) {
   }
 }
 
+function armorCount(p) {
+  if (!p.armorSet) return 0;
+  let n = 0;
+  for (const slot of ['head', 'chest', 'legs', 'feet']) if (p.armorSet[slot]) n++;
+  return n;
+}
+
 export function wirePlayer(p) {
   return {
     i: p.id, n: p.name,
     x: Math.round(p.x), y: Math.round(p.y), vx: Math.round(p.vx),
     f: p.face, a: p.anim, h: Math.round(p.hp), e: p.equip,
+    ar: armorCount(p), md: p.mount ? 1 : 0,
   };
 }
 
@@ -92,8 +102,10 @@ function doJoin(ws, msg) {
     thirst: Number.isFinite(prof?.stats?.thirst) ? prof.stats.thirst : STATS_MAX,
     inv: prof && prof.inv && typeof prof.inv === 'object' ? prof.inv : {},
     equip: typeof prof?.equip === 'string' ? prof.equip : '',
+    armorSet: prof && prof.armorSet && typeof prof.armorSet === 'object'
+      ? prof.armorSet : { head: '', chest: '', legs: '', feet: '' },
     mount: null, rideDir: 0, rideJump: false, deathCause: null,
-    lastSwing: 0, lastChat: 0, lastStatSig: '',
+    lastSwing: 0, lastChat: 0, lastShot: 0, lastStatSig: '',
   };
   world.players.set(p.id, p);
 
@@ -106,7 +118,7 @@ function doJoin(ws, msg) {
     dinos: wireDinos(),
     players: [...world.players.values()].filter((o) => o.id !== p.id).map(wirePlayer),
     you: {
-      x: p.x, y: p.y, inv: p.inv, equip: p.equip,
+      x: p.x, y: p.y, inv: p.inv, equip: p.equip, armor: p.armorSet,
       stats: { hp: p.hp, hunger: p.hunger, thirst: p.thirst },
     },
   });

@@ -11,24 +11,43 @@ function nameHash(name) {
 }
 
 function drawTool(ctx, tool, br) {
-  // Drawn in hand-space: origin at the hand, pointing up.
+  // Drawn in hand-space: origin at the hand, pointing up. Metal variants share
+  // the stone shapes with a brighter head.
+  const metal = tool === 'metal_axe' || tool === 'metal_pick';
+  const head = metal ? shade(200, 206, 222, br) : shade(150, 156, 170, br);
+  const base = tool === 'metal_axe' ? 'axe' : tool === 'metal_pick' ? 'pick' : tool;
   ctx.strokeStyle = shade(120, 88, 52, br);
   ctx.lineWidth = 4;
-  ctx.beginPath(); ctx.moveTo(0, 4); ctx.lineTo(0, -22); ctx.stroke();
-  if (tool === 'axe') {
-    ctx.fillStyle = shade(150, 156, 170, br);
+  if (base !== 'gun') { ctx.beginPath(); ctx.moveTo(0, 4); ctx.lineTo(0, -22); ctx.stroke(); }
+  if (base === 'axe') {
+    ctx.fillStyle = head;
     ctx.beginPath();
     ctx.moveTo(-1, -22); ctx.lineTo(12, -26); ctx.lineTo(12, -14); ctx.lineTo(-1, -16);
     ctx.closePath(); ctx.fill();
-  } else if (tool === 'pick') {
-    ctx.strokeStyle = shade(150, 156, 170, br);
+  } else if (base === 'pick') {
+    ctx.strokeStyle = head;
     ctx.lineWidth = 4;
     ctx.beginPath(); ctx.moveTo(-10, -18); ctx.quadraticCurveTo(0, -28, 10, -18); ctx.stroke();
-  } else if (tool === 'spear') {
+  } else if (base === 'spear') {
     ctx.strokeStyle = shade(120, 88, 52, br);
     ctx.beginPath(); ctx.moveTo(0, 8); ctx.lineTo(0, -30); ctx.stroke();
     ctx.fillStyle = shade(160, 166, 180, br);
     ctx.beginPath(); ctx.moveTo(-4, -28); ctx.lineTo(0, -40); ctx.lineTo(4, -28); ctx.closePath(); ctx.fill();
+  } else if (base === 'sword') {
+    ctx.strokeStyle = shade(90, 66, 44, br); ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.moveTo(-6, 2); ctx.lineTo(6, 2); ctx.stroke(); // guard
+    ctx.strokeStyle = shade(206, 212, 228, br); ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(0, 2); ctx.lineTo(0, -34); ctx.stroke();
+    ctx.fillStyle = shade(230, 234, 246, br);
+    ctx.beginPath(); ctx.moveTo(-2, -34); ctx.lineTo(0, -40); ctx.lineTo(2, -34); ctx.closePath(); ctx.fill();
+  } else if (base === 'gun') {
+    // rifle held roughly horizontal
+    ctx.fillStyle = shade(60, 62, 70, br);
+    ctx.fillRect(-2, -6, 34, 5);
+    ctx.fillStyle = shade(96, 66, 40, br);
+    ctx.fillRect(-6, -6, 10, 12);
+    ctx.strokeStyle = shade(60, 62, 70, br); ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(4, 2); ctx.lineTo(0, 10); ctx.stroke(); // trigger guard
   }
 }
 
@@ -51,9 +70,11 @@ export function drawPlayer(ctx, x, y, info, br, t) {
   ctx.translate(cx, y + PLAYER_H - bob);
   ctx.scale(info.face < 0 ? -1 : 1, 1);
 
+  const armor = info.armor || 0;
+
   // legs
-  ctx.strokeStyle = pants;
-  ctx.lineWidth = 7;
+  ctx.strokeStyle = armor >= 3 ? shade(150, 158, 176, br) : pants;
+  ctx.lineWidth = armor >= 3 ? 8 : 7;
   ctx.lineCap = 'round';
   const legSpread = jump ? 0.35 : leg;
   ctx.beginPath();
@@ -61,9 +82,14 @@ export function drawPlayer(ctx, x, y, info, br, t) {
   ctx.moveTo(3, -26); ctx.lineTo(3 - Math.sin(legSpread) * 12, -2);
   ctx.stroke();
 
-  // torso
-  ctx.fillStyle = shirt;
+  // torso (metal chestplate when body armor is worn)
+  ctx.fillStyle = armor >= 2 ? shade(156, 164, 182, br) : shirt;
   ctx.fillRect(-9, -46, 18, 22);
+  if (armor >= 2) {
+    ctx.strokeStyle = shade(112, 120, 140, br); ctx.lineWidth = 1.5;
+    ctx.strokeRect(-8, -45, 16, 20);
+    ctx.beginPath(); ctx.moveTo(0, -45); ctx.lineTo(0, -25); ctx.stroke();
+  }
 
   // back arm
   const swingProg = info.anim === 'swing' ? (info.swingProg ?? ((t * 0.006) % 1)) : -1;
@@ -80,10 +106,19 @@ export function drawPlayer(ctx, x, y, info, br, t) {
   // head
   ctx.fillStyle = skin;
   ctx.beginPath(); ctx.arc(0, -55, 9.5, 0, 7); ctx.fill();
-  ctx.fillStyle = hairC;
-  ctx.beginPath(); ctx.arc(0, -58, 9.5, Math.PI, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#222';
-  ctx.fillRect(4, -57, 2.4, 2.4);
+  if (armor >= 1) {
+    // metal helmet dome + brim
+    ctx.fillStyle = shade(176, 182, 200, br);
+    ctx.beginPath(); ctx.arc(0, -56, 10.5, Math.PI, Math.PI * 2); ctx.fill();
+    ctx.fillRect(-10.5, -56, 21, 3.5);
+    ctx.fillStyle = '#222';
+    ctx.fillRect(4, -56, 3, 2.2);
+  } else {
+    ctx.fillStyle = hairC;
+    ctx.beginPath(); ctx.arc(0, -58, 9.5, Math.PI, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#222';
+    ctx.fillRect(4, -57, 2.4, 2.4);
+  }
 
   // front arm + tool
   ctx.save();

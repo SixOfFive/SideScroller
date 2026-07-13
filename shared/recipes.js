@@ -47,6 +47,57 @@ export const RECIPES = {
     cost: { thatch: 15, wood: 2, fiber: 7 },
     desc: 'Caps a wall. You can stand on it.',
   },
+
+  // --- metal tier (tier 2) ---------------------------------------------------
+  forge: {
+    name: 'Forge', structure: 'forge', tier: 2,
+    cost: { stone: 40, wood: 12, thatch: 8 },
+    desc: 'Smelts metal ore into ingots (E, needs wood). Yields charcoal too.',
+  },
+  metal_axe: {
+    name: 'Metal Axe', gives: { metal_axe: 1 }, tier: 2,
+    cost: { metal_ingot: 3, wood: 2 },
+    desc: 'Chops far more wood and hits harder than stone.',
+  },
+  metal_pick: {
+    name: 'Metal Pick', gives: { metal_pick: 1 }, tier: 2,
+    cost: { metal_ingot: 3, wood: 2 },
+    desc: 'Rips ore and stone out fast.',
+  },
+  sword: {
+    name: 'Metal Sword', gives: { sword: 1 }, tier: 2,
+    cost: { metal_ingot: 6, wood: 2, fiber: 6 },
+    desc: 'A real weapon — good against raptors up close.',
+  },
+  metal_helmet: {
+    name: 'Metal Helmet', gives: { metal_helmet: 1 }, tier: 2,
+    cost: { metal_ingot: 8 }, desc: 'Head armor. Wear it from your inventory.',
+  },
+  metal_chest: {
+    name: 'Metal Chestplate', gives: { metal_chest: 1 }, tier: 2,
+    cost: { metal_ingot: 14 }, desc: 'Body armor — the bulk of your protection.',
+  },
+  metal_legs: {
+    name: 'Metal Leggings', gives: { metal_legs: 1 }, tier: 2,
+    cost: { metal_ingot: 10 }, desc: 'Leg armor.',
+  },
+  metal_boots: {
+    name: 'Metal Boots', gives: { metal_boots: 1 }, tier: 2,
+    cost: { metal_ingot: 6 }, desc: 'Foot armor. A full set lets you face raptors.',
+  },
+  gunpowder: {
+    name: 'Gunpowder', gives: { gunpowder: 2 }, tier: 2,
+    cost: { charcoal: 1, flint: 1 }, desc: 'Charcoal + flint. Ammo needs it.',
+  },
+  bullet: {
+    name: 'Bullets ×4', gives: { bullet: 4 }, tier: 2,
+    cost: { metal_ingot: 1, gunpowder: 2 }, desc: 'Rifle ammunition.',
+  },
+  rifle: {
+    name: 'Rifle', gives: { rifle: 1 }, tier: 2,
+    cost: { metal_ingot: 10, wood: 8, fiber: 12 },
+    desc: 'Ranged firepower. Equip it, needs bullets. Even a rex fears it.',
+  },
 };
 
 export const BUILDABLES = Object.keys(RECIPES).filter((k) => RECIPES[k].structure);

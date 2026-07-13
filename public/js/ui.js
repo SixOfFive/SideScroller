@@ -2,7 +2,7 @@
 
 import { on, sendMsg } from './net.js';
 import { state } from './state.js';
-import { ITEMS, itemName } from '/shared/items.js';
+import { ITEMS, itemName, isArmor } from '/shared/items.js';
 import { RECIPES, CRAFTABLES, BUILDABLES } from '/shared/recipes.js';
 
 const $ = (id) => document.getElementById(id);
@@ -23,7 +23,12 @@ export function toast(msg) {
 // --- inventory + crafting ----------------------------------------------------
 
 const ITEM_ORDER = ['wood', 'thatch', 'stone', 'flint', 'fiber', 'hide',
-  'berry', 'egg', 'raw_meat', 'cooked_meat', 'stone_axe', 'stone_pick', 'spear'];
+  'metal_ore', 'metal_ingot', 'charcoal', 'gunpowder', 'bullet',
+  'berry', 'egg', 'raw_meat', 'cooked_meat',
+  'stone_axe', 'stone_pick', 'spear', 'metal_axe', 'metal_pick', 'sword', 'rifle',
+  'metal_helmet', 'metal_chest', 'metal_legs', 'metal_boots'];
+
+const ARMOR_SLOTS = [['head', 'Head'], ['chest', 'Chest'], ['legs', 'Legs'], ['feet', 'Feet']];
 
 function costLine(cost) {
   const span = el('span', 'cost');
@@ -65,12 +70,43 @@ function refreshInv() {
       b.onclick = () => sendMsg({ t: 'equip', item: equipped ? '' : id });
       row.append(b);
     }
+    if (def.armor) {
+      const b = el('button', '', 'Wear');
+      b.onclick = () => sendMsg({ t: 'wear', item: id });
+      row.append(b);
+    }
+    left.append(row);
+  }
+
+  // Worn armor + total protection
+  const armor = state.me.armor || {};
+  let totalV = 0;
+  for (const [slot] of ARMOR_SLOTS) {
+    const it = armor[slot];
+    if (it && ITEMS[it] && ITEMS[it].armor) totalV += ITEMS[it].armor.v;
+  }
+  left.append(el('h3', '', `Worn Armor — ${Math.round(Math.min(0.78, totalV / 90) * 100)}% protection`));
+  for (const [slot, label] of ARMOR_SLOTS) {
+    const it = armor[slot];
+    const row = el('div', 'itemrow');
+    row.append(el('span', 'qty', label));
+    row.append(el('span', 'nm', it ? itemName(it) : '— empty —'));
+    if (it) {
+      const b = el('button', '', 'Take off');
+      b.onclick = () => sendMsg({ t: 'takeoff', slot });
+      row.append(b);
+    }
     left.append(row);
   }
 
   right.append(el('h3', '', 'Craft'));
+  let shownMetalHeading = false;
   for (const id of CRAFTABLES) {
     const r = RECIPES[id];
+    if (r.tier === 2 && !shownMetalHeading) {
+      shownMetalHeading = true;
+      right.append(el('h3', '', '⚙ Metal Tier'));
+    }
     const box = el('div', 'recipe');
     box.append(el('span', 'rname', r.name), el('br'), costLine(r.cost), el('br'));
     if (r.desc) box.append(el('span', 'desc', r.desc), el('br'));
@@ -80,7 +116,7 @@ function refreshInv() {
     box.append(b);
     right.append(box);
   }
-  right.append(el('p', 'cost', 'Structures are placed with the build bar — press Q.'));
+  right.append(el('p', 'cost', 'Structures (incl. the Forge) are placed with the build bar — press Q.'));
 }
 
 export function toggleInv() {

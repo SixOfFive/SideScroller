@@ -50,6 +50,10 @@ export function playerTool(p) {
   return def && def.tool ? def.tool : 'hand';
 }
 
+// Metal tools reuse the stone tool's yield table but harvest faster and richer.
+const TOOL_CATEGORY = { metal_axe: 'axe', metal_pick: 'pick', sword: 'spear', gun: 'hand' };
+const TOOL_TIER = { metal_axe: 1.7, metal_pick: 1.7, sword: 1.2 };
+
 export function harvest(p, m) {
   const node = world.nodes.get(m.node);
   if (!node || node.dep) return;
@@ -58,13 +62,16 @@ export function harvest(p, m) {
   const dx = node.x - (p.x + PLAYER_W / 2);
   if (Math.abs(dx) > HARVEST_RANGE + 50) return;
 
-  const table = YIELDS[node.kind][playerTool(p)] || YIELDS[node.kind].hand;
-  node.hp -= table.dmg;
+  const tool = playerTool(p);
+  const cat = TOOL_CATEGORY[tool] || tool;
+  const tier = TOOL_TIER[tool] || 1;
+  const table = YIELDS[node.kind][cat] || YIELDS[node.kind].hand;
+  node.hp -= table.dmg * tier;
 
   let gained = false;
   for (const [item, lo, hi, chance] of table.rolls) {
     if (Math.random() >= chance) continue;
-    const qty = randInt(lo, hi);
+    const qty = Math.round(randInt(lo, hi) * tier);
     if (qty <= 0) continue;
     invAdd(p.inv, item, qty);
     send(p, { t: 'gain', item, qty });

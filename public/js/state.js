@@ -21,6 +21,7 @@ export const state = {
   me: {
     x: 0, y: 0, vx: 0, vy: 0, grounded: true, face: 1, anim: 'idle',
     swingT: 0, hp: 100, hunger: 100, thirst: 100, inv: {}, equip: '',
+    armor: { head: '', chest: '', legs: '', feet: '' },
     speedMul: 1, inWater: false,
     mounted: false, mountId: null,
     hurtT: 0, shake: 0,     // damage flash + screen-shake timers
@@ -134,6 +135,7 @@ on('welcome', (m) => {
     hp: m.you.stats.hp, hunger: m.you.stats.hunger,
     thirst: m.you.stats.thirst ?? 100,
     inv: m.you.inv, equip: m.you.equip,
+    armor: m.you.armor || { head: '', chest: '', legs: '', feet: '' },
     mounted: false, mountId: null,
   });
   if (m.settings) state.settings = m.settings;
@@ -184,7 +186,11 @@ on('supd', (m) => {
 });
 on('srem', (m) => state.structures.delete(m.id));
 
-on('inv', (m) => { state.me.inv = m.inv; state.me.equip = m.equip; });
+on('inv', (m) => {
+  state.me.inv = m.inv;
+  state.me.equip = m.equip;
+  if (m.armor) state.me.armor = m.armor;
+});
 on('stats', (m) => {
   state.me.hp = m.hp;
   state.me.hunger = m.hunger;

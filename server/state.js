@@ -32,8 +32,9 @@ export function syncProfile(p) {
     x: Math.round(p.x),
     y: Math.round(p.y),
     inv: p.inv,
-    stats: { hp: p.hp, hunger: p.hunger },
+    stats: { hp: p.hp, hunger: p.hunger, thirst: p.thirst },
     equip: p.equip,
+    armorSet: p.armorSet,
     tokenHash: p.tokenHash,
     lastSeen: Date.now(),
   };

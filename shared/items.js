@@ -8,6 +8,10 @@ export const ITEMS = {
   fiber:       { name: 'Fiber' },
   hide:        { name: 'Hide' },
   metal_ore:   { name: 'Metal Ore' },
+  metal_ingot: { name: 'Metal Ingot' },
+  charcoal:    { name: 'Charcoal' },
+  gunpowder:   { name: 'Gunpowder' },
+  bullet:      { name: 'Bullet' },
   berry:       { name: 'Berries',     food: { hunger: 8,  hp: 0 } },
   raw_meat:    { name: 'Raw Meat',    food: { hunger: 10, hp: -4 } },
   cooked_meat: { name: 'Cooked Meat', food: { hunger: 30, hp: 8 } },
@@ -15,7 +19,20 @@ export const ITEMS = {
   stone_axe:   { name: 'Stone Axe',   tool: 'axe' },
   stone_pick:  { name: 'Stone Pick',  tool: 'pick' },
   spear:       { name: 'Spear',       tool: 'spear' },
+  metal_axe:   { name: 'Metal Axe',   tool: 'metal_axe' },
+  metal_pick:  { name: 'Metal Pick',  tool: 'metal_pick' },
+  sword:       { name: 'Metal Sword', tool: 'sword' },
+  rifle:       { name: 'Rifle',       tool: 'gun' },
+  // Armor pieces (worn, not consumed). armor.v adds to total damage reduction.
+  metal_helmet: { name: 'Metal Helmet',     armor: { slot: 'head',  v: 16 } },
+  metal_chest:  { name: 'Metal Chestplate', armor: { slot: 'chest', v: 24 } },
+  metal_legs:   { name: 'Metal Leggings',   armor: { slot: 'legs',  v: 18 } },
+  metal_boots:  { name: 'Metal Boots',      armor: { slot: 'feet',  v: 12 } },
 };
+
+export function isArmor(id) {
+  return isItem(id) && !!ITEMS[id].armor;
+}
 
 // Own-property check so ids like '__proto__' or 'constructor' never resolve
 // through the prototype chain.

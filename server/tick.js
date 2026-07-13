@@ -66,7 +66,7 @@ function step() {
   }
 
   for (const s of world.structures.values()) {
-    if (s.kind === 'campfire' && s.lit) {
+    if ((s.kind === 'campfire' || s.kind === 'forge') && s.lit) {
       s.fuelS -= dt;
       if (s.fuelS <= 0) {
         s.fuelS = 0;

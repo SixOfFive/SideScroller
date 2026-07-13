@@ -66,6 +66,10 @@ on('fx', (m) => {
   if (m.kind === 'heart') addHeart(m.x, m.y);
   if (m.kind === 'poof') addPuff(m.x, m.y, '#cfd4e0', 12);
   if (m.kind === 'hit') addPuff(m.x, m.y, '#e0654e', 5);
+  if (m.kind === 'muzzle') addPuff(m.x, m.y, '#ffe08a', 5);
+  if (m.kind === 'tracer') {
+    parts.push({ kind: 'tracer', x: m.x, y: m.y, x2: m.x2, y2: m.y2, ttl: 0.13, max: 0.13 });
+  }
 });
 
 on('hurt', (m) => {
@@ -110,6 +114,11 @@ export function drawFx(ctx, dt, camX, viewW) {
       ctx.globalAlpha = f * 0.3;
       ctx.fillStyle = '#c9cdd6';
       ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (2 - f), 0, 7); ctx.fill();
+    } else if (p.kind === 'tracer') {
+      ctx.globalAlpha = f;
+      ctx.strokeStyle = '#ffe9a0';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x2, p.y2); ctx.stroke();
     }
   }
   ctx.globalAlpha = 1;

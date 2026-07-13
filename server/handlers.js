@@ -1,7 +1,7 @@
 // Message routing plus the small handlers (movement, equip, eat, chat, craft).
 // Bigger systems live in their own modules.
 
-import { ITEMS, isItem } from '../shared/items.js';
+import { ITEMS, isItem, isArmor } from '../shared/items.js';
 import { RECIPES } from '../shared/recipes.js';
 import {
   WORLD_W, PLAYER_W, CHAT_MAX, STATS_MAX,
@@ -11,7 +11,9 @@ import { invAdd, invRemove, invCount, invPayCost } from './inventory.js';
 import { harvest } from './harvest.js';
 import { build, demolish } from './building.js';
 import { use } from './interact.js';
-import { attack, feed, dinoCmd, setRideInput } from './dinos.js';
+import { attack, feed, dinoCmd, setRideInput, shoot } from './dinos.js';
+
+const ARMOR_SLOTS = ['head', 'chest', 'legs', 'feet'];
 
 const ANIMS = new Set(['idle', 'walk', 'jump', 'swing']);
 const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
@@ -70,7 +72,25 @@ const HANDLERS = {
     broadcast({ t: 'chat', from: p.name, text });
   },
 
-  harvest, build, demolish, use, attack, feed, dinoCmd,
+  wear(p, m) {
+    if (!isArmor(m.item) || invCount(p.inv, m.item) < 1) return;
+    const slot = ITEMS[m.item].armor.slot;
+    if (p.armorSet[slot]) invAdd(p.inv, p.armorSet[slot], 1); // swap out the old piece
+    invRemove(p.inv, m.item, 1);
+    p.armorSet[slot] = m.item;
+    toast(p, `Equipped ${ITEMS[m.item].name}`);
+    sendInv(p);
+  },
+
+  takeoff(p, m) {
+    const slot = typeof m.slot === 'string' ? m.slot : '';
+    if (!ARMOR_SLOTS.includes(slot) || !p.armorSet[slot]) return;
+    invAdd(p.inv, p.armorSet[slot], 1);
+    p.armorSet[slot] = '';
+    sendInv(p);
+  },
+
+  harvest, build, demolish, use, attack, feed, dinoCmd, shoot,
 };
 
 export function route(p, msg) {

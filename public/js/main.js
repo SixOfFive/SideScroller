@@ -16,6 +16,7 @@ import { initChat, focusChat } from './chat.js';
 import { HARVEST_RANGE, INTERACT_RANGE, PLAYER_W, PLAYER_H } from '/shared/const.js';
 import { STRUCTURES } from '/shared/structures.js';
 import { DINODEFS } from '/shared/dinodefs.js';
+import { ITEMS } from '/shared/items.js';
 import { interp } from './state.js';
 
 const canvas = document.getElementById('game');
@@ -58,8 +59,17 @@ const EQUIP_SLOTS = { equip1: '', equip2: 'stone_axe', equip3: 'stone_pick', equ
 
 function doSwing() {
   if (state.me.mounted || state.me.swingT > 0.05) return;
-  state.me.swingT = 0.35;
   const cx = meCenter();
+  const equipped = ITEMS[state.me.equip];
+  if (equipped && equipped.tool === 'gun') {
+    const dino = findNearestDino(800, (d) => !d.o);
+    if (!dino) { toast('No target in range'); return; } // don't waste bullets on air
+    state.me.swingT = 0.2;
+    state.me.face = Math.sign(dino.x + (DINODEFS[dino.sp]?.w || 40) / 2 - cx) || state.me.face;
+    sendMsg({ t: 'shoot', dino: dino.i });
+    return;
+  }
+  state.me.swingT = 0.35;
   const node = findNearestNode(HARVEST_RANGE + 40);
   // wide detection so big dinos (rex) register; the server range-checks by size
   const dino = findNearestDino(HARVEST_RANGE + 120, (d) => !d.o);

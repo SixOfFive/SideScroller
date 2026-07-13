@@ -106,11 +106,12 @@ export function render(dt) {
   for (const p of state.players.values()) {
     const pos = interp(p);
     drawPlayer(ctx, pos.x, pos.y,
-      { name: p.n, face: p.f, anim: p.a, tool: toolOf(p.e), hp: p.h }, br, t);
+      { name: p.n, face: p.f, anim: p.a, tool: toolOf(p.e), hp: p.h, armor: p.ar || 0 }, br, t);
   }
+  const myArmor = me.armor ? Object.values(me.armor).filter(Boolean).length : 0;
   drawPlayer(ctx, me.x, me.y, {
     name: state.name, face: me.face, anim: me.anim, tool: toolOf(me.equip),
-    hp: me.hp, isMe: true, swingProg: 1 - me.swingT / 0.35,
+    hp: me.hp, isMe: true, armor: myArmor, swingProg: 1 - me.swingT / 0.35,
   }, br, t);
 
   drawFx(ctx, dt, cam.x, cam.viewW);

@@ -4,6 +4,7 @@
 
 import { world, newId } from './state.js';
 import { DINODEFS, WEAPON_DMG } from '../shared/dinodefs.js';
+import { ITEMS } from '../shared/items.js';
 import { REGIONS, REGION_W } from '../shared/regions.js';
 import { WORLD_W, HARVEST_RANGE, INTERACT_RANGE, PLAYER_W, PLAYER_H, GRAVITY } from '../shared/const.js';
 import { groundAt } from '../shared/terrain.js';
@@ -112,6 +113,20 @@ function nearestPlayer(d, range) {
   return best;
 }
 
+// Total damage reduction from worn metal armor (0..0.78). A full set ~0.78,
+// which turns a lethal raptor into something survivable.
+function armorReduction(p) {
+  let total = 0;
+  const set = p.armorSet;
+  if (set) {
+    for (const slot of ['head', 'chest', 'legs', 'feet']) {
+      const it = set[slot];
+      if (it && ITEMS[it] && ITEMS[it].armor) total += ITEMS[it].armor.v;
+    }
+  }
+  return Math.min(0.78, total / 90);
+}
+
 function bite(d, p, def, now) {
   d.lastBite = now;
   // A mounted rider is shielded — the mount soaks the hit instead.
@@ -123,10 +138,11 @@ function bite(d, p, def, now) {
     return;
   }
   if (!world.settings.damage) return;
-  p.hp = Math.max(0, p.hp - def.dmg);
+  const dmg = def.dmg * (1 - armorReduction(p));
+  p.hp = Math.max(0, p.hp - dmg);
   p.deathCause = def.name;
   const kx = Math.sign(playerCenter(p) - dinoCenter(d)) || 1;
-  send(p, { t: 'hurt', dmg: Math.round(def.dmg), kx: kx * 260 });
+  send(p, { t: 'hurt', dmg: Math.max(1, Math.round(dmg)), kx: kx * 260 });
   sendStats(p);
   broadcast({ t: 'fx', kind: 'hit', x: playerCenter(p), y: p.y + 20 });
 }
@@ -306,6 +322,32 @@ export function attack(p, m) {
     d.lastBite = Math.max(d.lastBite, Date.now() - def.attackCd * 1000 + 250);
   }
   broadcast({ t: 'fx', kind: 'hit', x: dinoCenter(d), y: d.y + 10 });
+  if (d.hp <= 0) killDino(d, p);
+}
+
+const GUN_RANGE = 780;
+const GUN_COOLDOWN_MS = 520;
+
+export function shoot(p, m) {
+  if (playerTool(p) !== 'gun') return;
+  const now = Date.now();
+  if (now - (p.lastShot || 0) < GUN_COOLDOWN_MS) return;
+  p.lastShot = now;
+  if (!invRemove(p.inv, 'bullet', 1)) { toast(p, 'Out of bullets'); return; }
+  sendInv(p);
+  const muzzleX = playerCenter(p) + p.face * 22, muzzleY = p.y + 22;
+  broadcast({ t: 'fx', kind: 'muzzle', x: muzzleX, y: muzzleY });
+
+  const d = world.dinos.get(m.dino);
+  if (!d || d.owner) return;
+  const dist = Math.abs(dinoCenter(d) - playerCenter(p));
+  if (dist > GUN_RANGE) return;
+  const def = DINODEFS[d.sp];
+  broadcast({ t: 'fx', kind: 'tracer', x: muzzleX, y: muzzleY, x2: dinoCenter(d), y2: d.y + def.h / 2 });
+  d.hp -= WEAPON_DMG.gun;
+  if (d.tame > 0) d.tame = 0;
+  if (def.behavior === 'passive') { d.state = 'flee'; d.fleeFrom = playerCenter(p); d.stateT = 4; }
+  broadcast({ t: 'fx', kind: 'hit', x: dinoCenter(d), y: d.y + def.h / 2 });
   if (d.hp <= 0) killDino(d, p);
 }
 

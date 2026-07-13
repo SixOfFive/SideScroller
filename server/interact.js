@@ -35,6 +35,29 @@ export function use(p, m) {
     return;
   }
 
+  if (s.kind === 'forge') {
+    if (m.action !== 'smelt') return;
+    const ore = invCount(p.inv, 'metal_ore');
+    if (!ore) { toast(p, 'No metal ore to smelt'); return; }
+    const wood = invCount(p.inv, 'wood');
+    if (!wood) { toast(p, 'Need wood to fire the forge'); return; }
+    const n = Math.min(ore, wood, 10);
+    invRemove(p.inv, 'metal_ore', n);
+    invRemove(p.inv, 'wood', n);
+    invAdd(p.inv, 'metal_ingot', n);
+    let char = 0;
+    for (let i = 0; i < n; i++) if (Math.random() < 0.34) char++;
+    if (char) invAdd(p.inv, 'charcoal', char);
+    s.lit = true;
+    s.fuelS = 8; // glow briefly after a smelt
+    send(p, { t: 'gain', item: 'metal_ingot', qty: n });
+    if (char) send(p, { t: 'gain', item: 'charcoal', qty: char });
+    broadcast({ t: 'supd', s });
+    sendInv(p);
+    toast(p, `Smelted ${n} ingot${n > 1 ? 's' : ''}${char ? ` (+${char} charcoal)` : ''}`);
+    return;
+  }
+
   if (s.kind === 'campfire') {
     if (m.action === 'fuel') {
       if (!invRemove(p.inv, 'wood', 1)) { toast(p, 'Need wood for fuel'); return; }
