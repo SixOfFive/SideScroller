@@ -1,7 +1,7 @@
 // The authoritative world state, plus save/load.
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
-import { DATA_DIR, SAVE_PATH } from './config.js';
+import { readFileSync, writeFileSync, renameSync, mkdirSync, existsSync } from 'node:fs';
+import { DATA_DIR, SAVE_PATH, SAVE_TMP_PATH, MAX_PROFILES } from './config.js';
 
 export const world = {
   nodes: new Map(),      // id -> {id, kind, x, hp, max, dep, depAt}
@@ -26,11 +26,26 @@ export function syncProfile(p) {
     inv: p.inv,
     stats: { hp: p.hp, hunger: p.hunger },
     equip: p.equip,
+    tokenHash: p.tokenHash,
+    lastSeen: Date.now(),
   };
+}
+
+// Keep the profile map bounded: evict the longest-offline profiles.
+function evictStaleProfiles() {
+  const keys = Object.keys(world.profiles);
+  if (keys.length <= MAX_PROFILES) return;
+  const online = new Set([...world.players.values()].map((p) => p.key));
+  keys
+    .filter((k) => !online.has(k))
+    .sort((a, b) => (world.profiles[a].lastSeen || 0) - (world.profiles[b].lastSeen || 0))
+    .slice(0, keys.length - MAX_PROFILES)
+    .forEach((k) => delete world.profiles[k]);
 }
 
 export function saveWorld() {
   for (const p of world.players.values()) syncProfile(p);
+  evictStaleProfiles();
   const data = {
     time: world.time,
     nextId: world.nextId,
@@ -41,7 +56,9 @@ export function saveWorld() {
   };
   try {
     if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
-    writeFileSync(SAVE_PATH, JSON.stringify(data));
+    // Write-then-rename so a crash mid-write can't corrupt the only save.
+    writeFileSync(SAVE_TMP_PATH, JSON.stringify(data));
+    renameSync(SAVE_TMP_PATH, SAVE_PATH);
   } catch (e) {
     console.error('save failed:', e.message);
   }

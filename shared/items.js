@@ -16,6 +16,12 @@ export const ITEMS = {
   spear:       { name: 'Spear',       tool: 'spear' },
 };
 
+// Own-property check so ids like '__proto__' or 'constructor' never resolve
+// through the prototype chain.
+export function isItem(id) {
+  return typeof id === 'string' && Object.prototype.hasOwnProperty.call(ITEMS, id);
+}
+
 export function itemName(id) {
-  return ITEMS[id] ? ITEMS[id].name : id;
+  return isItem(id) ? ITEMS[id].name : String(id);
 }

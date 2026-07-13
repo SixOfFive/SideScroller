@@ -46,6 +46,12 @@ export function stepLocal(me, dt, held) {
   // Vertical: land on ground or one-way platform tops when falling.
   let ny = me.y + me.vy * dt;
   me.grounded = false;
+  if (me.vy < 0) { // head-bonk on the underside of solid walls only
+    for (const r of solids) {
+      if (me.x + PLAYER_W <= r.x + 4 || me.x >= r.x + r.w - 4) continue;
+      if (me.y >= r.y + r.h - 2 && ny < r.y + r.h) { ny = r.y + r.h; me.vy = 0; }
+    }
+  }
   if (me.vy >= 0) {
     const prevBottom = me.y + PLAYER_H;
     let landY = GROUND_Y;

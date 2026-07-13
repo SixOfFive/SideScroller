@@ -31,6 +31,7 @@ nameInput.value = localStorage.getItem('ss_name') || '';
 nameInput.focus();
 
 function tryJoin() {
+  if (joinBtn.disabled) return; // a join attempt is already in flight
   const name = nameInput.value.trim();
   if (!name) return;
   localStorage.setItem('ss_name', name);

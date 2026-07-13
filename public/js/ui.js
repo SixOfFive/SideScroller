@@ -213,6 +213,8 @@ export function initUI() {
   on('srem', (m) => { if (m.id === storageOpenId) closeStorage(); });
   on('dead', () => toast('You died! Back at the beach.'));
   on('disconnect', () => {
+    if (!state.joined) return; // pre-join refusal: keep the real joinErr message
+    state.joined = false;
     const j = $('join');
     j.classList.remove('hidden');
     $('joinErr').textContent = 'Disconnected — reload the page to rejoin.';

@@ -6,7 +6,7 @@ import { PLAYER_W } from '/shared/const.js';
 import { state } from './state.js';
 
 export const VIEW_H = 720;
-export const cam = { x: 0, scale: 1, viewW: 1280 };
+export const cam = { x: 0, scale: 1, viewW: 1280, dpr: 1 };
 
 export function updateCamera(canvas) {
   cam.scale = canvas.height / VIEW_H;
@@ -16,5 +16,6 @@ export function updateCamera(canvas) {
   cam.x = Math.min(Math.max(target, 0), max);
 }
 
-export function screenToWorldX(sx) { return cam.x + sx / cam.scale; }
-export function screenToWorldY(sy) { return sy / cam.scale; }
+// Mouse events give CSS px; the canvas backing store is device px.
+export function screenToWorldX(sx) { return cam.x + (sx * cam.dpr) / cam.scale; }
+export function screenToWorldY(sy) { return (sy * cam.dpr) / cam.scale; }

@@ -64,7 +64,9 @@ export function interp(e) {
       return { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f };
     }
   }
-  return { x: buf[buf.length - 1].x, y: buf[buf.length - 1].y };
+  // Whole buffer is newer than the render target: hold the oldest sample so
+  // the entity doesn't pop backward when interpolation kicks in.
+  return { x: buf[0].x, y: buf[0].y };
 }
 
 export function meCenter() {
@@ -120,7 +122,7 @@ on('welcome', (m) => {
   state.players.clear();
   state.dinos.clear();
   for (const n of m.nodes) state.nodes.set(n.id, n);
-  for (const s of m.structures) state.structures.set(s.id, s);
+  for (const s of m.structures) state.structures.set(s.id, stampFuel(s));
   for (const p of m.players) upsertRemote(p);
   for (const d of m.dinos) upsertDino(d);
   Object.assign(state.me, {
@@ -157,9 +159,16 @@ on('node', (m) => {
   n.dep = !!m.dep;
 });
 
-on('sadd', (m) => state.structures.set(m.s.id, m.s));
+// Stamp arrival time of fuel values so the HUD can run a local countdown.
+function stampFuel(s) {
+  if (s.fuelS !== undefined) s.fuelAt = performance.now();
+  return s;
+}
+
+on('sadd', (m) => state.structures.set(m.s.id, stampFuel(m.s)));
 on('supd', (m) => {
   const cur = state.structures.get(m.s.id);
+  stampFuel(m.s);
   state.structures.set(m.s.id, cur ? Object.assign(cur, m.s) : m.s);
 });
 on('srem', (m) => state.structures.delete(m.id));

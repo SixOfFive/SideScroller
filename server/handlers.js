@@ -1,7 +1,7 @@
 // Message routing plus the small handlers (movement, equip, eat, chat, craft).
 // Bigger systems live in their own modules.
 
-import { ITEMS } from '../shared/items.js';
+import { ITEMS, isItem } from '../shared/items.js';
 import { RECIPES } from '../shared/recipes.js';
 import {
   WORLD_W, GROUND_Y, PLAYER_W, PLAYER_H, CHAT_MAX, STATS_MAX,
@@ -29,14 +29,14 @@ const HANDLERS = {
   equip(p, m) {
     const item = typeof m.item === 'string' ? m.item : '';
     if (item === '') { p.equip = ''; sendInv(p); return; }
-    if (ITEMS[item] && ITEMS[item].tool && invCount(p.inv, item) > 0) {
+    if (isItem(item) && ITEMS[item].tool && invCount(p.inv, item) > 0) {
       p.equip = item;
       sendInv(p);
     }
   },
 
   eat(p, m) {
-    const def = ITEMS[m.item];
+    const def = isItem(m.item) ? ITEMS[m.item] : null;
     if (!def || !def.food) return;
     if (!invRemove(p.inv, m.item, 1)) { toast(p, 'None left'); return; }
     p.hunger = clamp(p.hunger + def.food.hunger, 0, STATS_MAX);
@@ -46,8 +46,9 @@ const HANDLERS = {
   },
 
   craft(p, m) {
+    if (typeof m.id !== 'string' || !Object.prototype.hasOwnProperty.call(RECIPES, m.id)) return;
     const r = RECIPES[m.id];
-    if (!r || r.structure) return;
+    if (r.structure) return;
     if (!invPayCost(p.inv, r.cost)) { toast(p, 'Not enough resources'); return; }
     for (const [item, qty] of Object.entries(r.gives)) invAdd(p.inv, item, qty);
     toast(p, `Crafted ${r.name}`);
@@ -55,16 +56,20 @@ const HANDLERS = {
   },
 
   chat(p, m) {
+    const now = Date.now();
+    if (now - p.lastChat < 600) return; // chat is the loudest broadcast path
     const text = String(m.text ?? '').slice(0, CHAT_MAX).trim();
-    if (text) broadcast({ t: 'chat', from: p.name, text });
+    if (!text) return;
+    p.lastChat = now;
+    broadcast({ t: 'chat', from: p.name, text });
   },
 
   harvest, build, demolish, use, attack, feed, dinoCmd,
 };
 
 export function route(p, msg) {
+  if (!Object.prototype.hasOwnProperty.call(HANDLERS, msg.t)) return;
   const h = HANDLERS[msg.t];
-  if (!h) return;
   try {
     h(p, msg);
   } catch (e) {

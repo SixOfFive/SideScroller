@@ -18,7 +18,7 @@ export function addFloat(text, color, x, y) {
     kind: 'float', text, color, x, y: y - floatStack * 16,
     vx: 0, vy: -42, ttl: 1.3, max: 1.3,
   });
-  floatStack++;
+  floatStack = (floatStack + 1) % 6; // cycle slots so long harvests don't drift skyward
 }
 
 export function addPuff(x, y, color, n = 7) {

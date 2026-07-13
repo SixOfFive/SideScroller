@@ -1,7 +1,7 @@
 // The 'use' message: campfire fueling/cooking and storage box transfers.
 
 import { world } from './state.js';
-import { ITEMS } from '../shared/items.js';
+import { isItem } from '../shared/items.js';
 import { STRUCTURES } from '../shared/structures.js';
 import { INTERACT_RANGE, PLAYER_W } from '../shared/const.js';
 import { send, toast, sendInv, broadcast } from './net.js';
@@ -40,7 +40,7 @@ export function use(p, m) {
   }
 
   if (s.kind === 'storage_box') {
-    const item = typeof m.item === 'string' && ITEMS[m.item] ? m.item : null;
+    const item = isItem(m.item) ? m.item : null;
     if (!item) return;
     let qty = Math.floor(Number(m.qty));
     if (!Number.isFinite(qty) || qty < 1) qty = 1;

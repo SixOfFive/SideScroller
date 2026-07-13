@@ -100,7 +100,9 @@ function contextHint(ctx, W) {
     const bits = [];
     const s = findNearestStructure(INTERACT_RANGE + 30, ['campfire', 'storage_box']);
     if (s && s.kind === 'campfire') {
-      bits.push(`E add wood${s.lit ? ` (${Math.ceil(s.fuelS)}s)` : ' to light'}`);
+      const left = Math.max(0,
+        Math.ceil(s.fuelS - (performance.now() - (s.fuelAt || performance.now())) / 1000));
+      bits.push(`E add wood${s.lit && left ? ` (${left}s)` : ' to light'}`);
       if (s.lit && (state.me.inv.raw_meat || 0) > 0) bits.push('C cook meat');
     }
     if (s && s.kind === 'storage_box') bits.push('E open box');

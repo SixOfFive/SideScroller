@@ -123,7 +123,8 @@ export function drawBg(ctx, viewW, viewH, camX, worldTime) {
   for (let i = 0; i < 7; i++) {
     const speed = 6 + hash01(i * 3) * 8;
     const cw = 90 + hash01(i * 5) * 120;
-    const cx = ((hash01(i * 11) * 3000 + worldTime * speed - camX * 0.4) % (viewW + 600)) - 300;
+    const span = viewW + 600;
+    const cx = ((((hash01(i * 11) * 3000 + worldTime * speed - camX * 0.4) % span) + span) % span) - 300;
     const cy = 60 + hash01(i * 17) * 180;
     ctx.beginPath();
     ctx.ellipse(cx, cy, cw, 18 + hash01(i) * 10, 0, 0, 7);
