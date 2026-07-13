@@ -31,7 +31,7 @@ export function wirePlayer(p) {
   return {
     i: p.id, n: p.name,
     x: Math.round(p.x), y: Math.round(p.y), vx: Math.round(p.vx),
-    f: p.face, a: p.anim, h: Math.round(p.hp),
+    f: p.face, a: p.anim, h: Math.round(p.hp), e: p.equip,
   };
 }
 

@@ -1,0 +1,116 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; background: #0b0e14; }
+body {
+  font-family: "Segoe UI", system-ui, sans-serif;
+  color: #dde4ee;
+  user-select: none;
+}
+canvas#game { position: fixed; inset: 0; display: block; }
+
+.hidden { display: none !important; }
+
+.overlay {
+  position: fixed; inset: 0; display: flex;
+  align-items: center; justify-content: center;
+  background: rgba(5, 8, 14, 0.55); z-index: 20;
+}
+.panel {
+  background: rgba(16, 21, 32, 0.94);
+  border: 1px solid #33405c;
+  border-radius: 10px;
+  padding: 18px 22px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+}
+.joinbox { text-align: center; width: 340px; }
+.joinbox h1 { letter-spacing: 6px; font-size: 26px; color: #ffd76e; }
+.joinbox .sub { color: #8fa2c0; font-size: 12px; margin: 6px 0 16px; }
+.joinbox input {
+  width: 100%; padding: 10px 12px; font-size: 16px; text-align: center;
+  background: #0b0e14; border: 1px solid #33405c; border-radius: 6px; color: #fff;
+}
+.joinbox button {
+  margin-top: 10px; width: 100%; padding: 10px; font-size: 15px; cursor: pointer;
+  background: #2e7d4f; color: #fff; border: 0; border-radius: 6px;
+}
+.joinbox button:hover { background: #38995f; }
+.joinbox .err { color: #ff7a7a; font-size: 13px; margin-top: 8px; min-height: 16px; }
+.joinbox .hint { color: #66758f; font-size: 11px; margin-top: 14px; line-height: 1.6; }
+
+.bigpanel {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  width: min(680px, 92vw); max-height: 82vh; overflow-y: auto; z-index: 15;
+}
+.bigpanel h2 { font-size: 15px; color: #ffd76e; margin-bottom: 8px; letter-spacing: 1px; }
+.bigpanel h3 { font-size: 12px; color: #8fa2c0; margin: 12px 0 6px; text-transform: uppercase; letter-spacing: 1px; }
+.bigpanel .cols { display: flex; gap: 18px; }
+.bigpanel .cols > div { flex: 1; min-width: 0; }
+
+.itemrow {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 6px; border-radius: 5px; font-size: 13px;
+}
+.itemrow:nth-child(odd) { background: rgba(255, 255, 255, 0.03); }
+.itemrow .qty { color: #ffd76e; min-width: 40px; text-align: right; }
+.itemrow .nm { flex: 1; }
+.itemrow button, .recipe button {
+  padding: 2px 10px; font-size: 12px; cursor: pointer;
+  background: #27405f; color: #cfe0f5; border: 1px solid #3c5a82; border-radius: 4px;
+}
+.itemrow button:hover, .recipe button:hover:not(:disabled) { background: #33547e; }
+.recipe { padding: 6px; border-radius: 5px; font-size: 13px; margin-bottom: 4px; background: rgba(255,255,255,0.03); }
+.recipe .cost { font-size: 11px; color: #8fa2c0; margin: 2px 0 4px; }
+.recipe .cost .miss { color: #ff8484; }
+.recipe .desc { font-size: 11px; color: #66758f; font-style: italic; }
+.recipe button:disabled { opacity: 0.4; cursor: default; }
+.recipe .rname { font-weight: 600; }
+
+#buildBar {
+  position: fixed; bottom: 96px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 6px; z-index: 14;
+}
+#buildBar button {
+  padding: 8px 12px; font-size: 12px; cursor: pointer;
+  background: rgba(16, 21, 32, 0.92); color: #cfe0f5;
+  border: 1px solid #33405c; border-radius: 6px;
+}
+#buildBar button.sel { border-color: #ffd76e; color: #ffd76e; }
+#buildBar button:disabled { opacity: 0.4; }
+
+#toasts {
+  position: fixed; bottom: 150px; left: 50%; transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  z-index: 18; pointer-events: none;
+}
+.toast {
+  background: rgba(16, 21, 32, 0.9); border: 1px solid #33405c;
+  padding: 6px 14px; border-radius: 6px; font-size: 13px;
+  animation: toastfade 2.6s forwards;
+}
+@keyframes toastfade {
+  0% { opacity: 0; transform: translateY(8px); }
+  10%, 75% { opacity: 1; transform: none; }
+  100% { opacity: 0; }
+}
+
+#chatLog {
+  position: fixed; left: 12px; bottom: 96px; width: 360px;
+  font-size: 13px; z-index: 12; pointer-events: none;
+  text-shadow: 0 1px 3px #000;
+}
+#chatLog .line { margin-top: 2px; opacity: 0.95; }
+#chatLog .line.old { opacity: 0.45; }
+#chatLog .who { color: #ffd76e; }
+#chatLog .sys { color: #8fa2c0; font-style: italic; }
+#chatForm { position: fixed; left: 12px; bottom: 64px; z-index: 16; }
+#chatForm input {
+  width: 360px; padding: 6px 10px; font-size: 13px;
+  background: rgba(11, 14, 20, 0.92); border: 1px solid #33405c;
+  border-radius: 6px; color: #fff;
+}
+
+.kbd {
+  display: inline-block; padding: 0 6px; border: 1px solid #4a5a78;
+  border-bottom-width: 2px; border-radius: 4px; background: #1a2233;
+  font-size: 11px; font-family: monospace;
+}
+#helpPanel p { font-size: 13px; margin: 5px 0; color: #b9c6da; }

@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SideScroller — survival island</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="join" class="overlay">
+  <div class="panel joinbox">
+    <h1>SIDESCROLLER</h1>
+    <p class="sub">an ARK-flavored 2D survival island &middot; up to 8 survivors</p>
+    <input id="nameInput" maxlength="16" placeholder="Survivor name" autocomplete="off">
+    <button id="joinBtn">Wash ashore</button>
+    <p id="joinErr" class="err"></p>
+    <p class="hint">A/D move &middot; Space jump &middot; click/F harvest &middot; E interact &middot; Tab inventory &middot; Q build &middot; H help</p>
+  </div>
+</div>
+
+<div id="invPanel" class="panel bigpanel hidden"></div>
+<div id="storagePanel" class="panel bigpanel hidden"></div>
+<div id="buildBar" class="hidden"></div>
+<div id="helpPanel" class="panel bigpanel hidden"></div>
+<div id="toasts"></div>
+<div id="chatLog"></div>
+<form id="chatForm" class="hidden"><input id="chatInput" maxlength="140" autocomplete="off" placeholder="say something…"></form>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
