@@ -72,11 +72,11 @@ function stepDino(d, dt, now) {
       const o = ownerOf(d);
       if (o) {
         const dx = playerCenter(o) - dinoCenter(d);
-        if (Math.abs(dx) > 2500) {
-          d.x = o.x - 70 * Math.sign(dx || 1);
+        if (Math.abs(dx) > 1400) {
+          d.x = o.x - 70 * Math.sign(dx || 1); // waddled too far behind: catch up
         } else if (Math.abs(dx) > 90) {
           d.face = Math.sign(dx);
-          d.x += Math.sign(dx) * def.speed * 1.7 * dt;
+          d.x += Math.sign(dx) * Math.max(def.speed * 1.7, 150) * dt;
         }
       }
     }
