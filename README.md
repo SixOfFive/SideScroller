@@ -28,15 +28,32 @@ network connect to `http://<your-LAN-IP>:3000`.
 
 ## Design notes
 
-- Resource nodes (trees, stone piles, berry bushes) respawn a few minutes after
-  being depleted, ARK-style.
-- Tool affinity matters: hands get thatch from trees, an axe gets wood; a pickaxe
-  gets more stone and flint.
-- The map is a long progressive strip — the spawn meadow is safe and sparse,
-  the deep forest and rocky hills further out are richer.
+- Resource nodes (trees, stone piles, berry bushes, metal veins) respawn a few
+  minutes after being depleted, ARK-style — and each night, any chunk of the
+  island with no players nearby is wiped and re-rolled: fresh nodes, fresh dinos.
+- Tool affinity and tiers matter: hands pull thatch, axes chop wood, picks mine
+  stone/flint/ore — and metal tools harvest 1.7x. Fists < stone < spear < metal
+  sword < rifle for damage.
+- The island is five regions of rising danger: the safe Spawn Meadow hub,
+  Whispering Forest, Rocky Highlands, Deep Wilds, and the Scorched Badlands.
+  Portals at the hub jump you to each region's entrance; return portals bring
+  you home — so one central base, exploring outward.
+- Terrain rolls: hills to jump up, valleys, and streams to drink from (watch
+  the thirst bar; berries help too).
+- Dinos: dodos and parasaurs are tameable with berries (parasaurs are
+  rideable — press R). Compys and dilos are small but aggressive; raptors will
+  shred anyone not in a full metal armor set; the T-Rex is best avoided until
+  you've built a rifle.
+- Metal tier: forge smelts ore into ingots (charcoal byproduct) → metal tools,
+  a full armor set (up to 78% damage reduction), gunpowder, bullets, rifle.
+- All sound is generated at runtime with WebAudio — no audio files. M mutes.
+- ESC opens options: toggle hunger/thirst/dino damage, day length, quit.
 
 ## Roadmap
 
 - [x] Stage 1: movement, gathering, crafting, building, campfire, hunger/food
 - [x] Stage 2: dodos — hunting and passive taming
-- [ ] Later: more dinos (Parasaur mount), metal tier, map gating, PvE threats
+- [x] Expansion: terrain/streams, combat roster (compy/dilo/parasaur/raptor/rex),
+      portals + region hub, night re-randomization, metal tier + rifle,
+      thirst, ESC options, procedural sound
+- [ ] Later: saddles + more mounts, ranged dinos, boss arenas, map gating tiers
