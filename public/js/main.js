@@ -13,6 +13,7 @@ import {
   openStorage, closeAllPanels,
 } from './ui.js';
 import { initChat, focusChat } from './chat.js';
+import { initSound, toggleMute, sfx } from './sound.js';
 import { HARVEST_RANGE, INTERACT_RANGE, PLAYER_W, PLAYER_H } from '/shared/const.js';
 import { STRUCTURES } from '/shared/structures.js';
 import { DINODEFS } from '/shared/dinodefs.js';
@@ -24,6 +25,7 @@ initRender(canvas);
 initInput(canvas);
 initUI();
 initChat();
+initSound();
 
 // --- join screen -------------------------------------------------------------
 
@@ -70,6 +72,7 @@ function doSwing() {
     return;
   }
   state.me.swingT = 0.35;
+  sfx('swing');
   const node = findNearestNode(HARVEST_RANGE + 40);
   // wide detection so big dinos (rex) register; the server range-checks by size
   const dino = findNearestDino(HARVEST_RANGE + 120, (d) => !d.o);
@@ -152,6 +155,7 @@ function processActions() {
         break;
       }
       case 'mount': toggleMount(); break;
+      case 'muteToggle': toast(toggleMute() ? 'Sounds muted (M)' : 'Sounds on'); break;
       case 'chat': focusChat(); break;
       case 'escape':
         if (state.build) cancelBuild();

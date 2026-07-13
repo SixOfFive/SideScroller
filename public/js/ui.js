@@ -2,6 +2,7 @@
 
 import { on, sendMsg } from './net.js';
 import { state } from './state.js';
+import { sfx } from './sound.js';
 import { ITEMS, itemName, isArmor } from '/shared/items.js';
 import { RECIPES, CRAFTABLES, BUILDABLES } from '/shared/recipes.js';
 
@@ -61,7 +62,7 @@ function refreshInv() {
     const def = ITEMS[id];
     if (def.food) {
       const b = el('button', '', 'Eat');
-      b.onclick = () => sendMsg({ t: 'eat', item: id });
+      b.onclick = () => { sfx('eat'); sendMsg({ t: 'eat', item: id }); };
       row.append(b);
     }
     if (def.tool) {
@@ -112,7 +113,7 @@ function refreshInv() {
     if (r.desc) box.append(el('span', 'desc', r.desc), el('br'));
     const b = el('button', '', 'Craft');
     b.disabled = !Object.entries(r.cost).every(([i, q]) => (state.me.inv[i] || 0) >= q);
-    b.onclick = () => sendMsg({ t: 'craft', id });
+    b.onclick = () => { sfx('craft'); sendMsg({ t: 'craft', id }); };
     box.append(b);
     right.append(box);
   }
@@ -185,9 +186,21 @@ function refreshBuildBar() {
   bar.replaceChildren();
   for (const kind of BUILDABLES) {
     const r = RECIPES[kind];
-    const b = el('button', state.build === kind ? 'sel' : '', r.name);
-    b.title = Object.entries(r.cost).map(([i, q]) => `${q} ${itemName(i)}`).join(', ')
-      + (r.desc ? ` — ${r.desc}` : '');
+    const b = el('button', state.build === kind ? 'sel' : '');
+    if (r.desc) b.title = r.desc;
+    b.append(el('div', 'bname', r.name));
+    // Visible requirements, red when you're short — no more tooltip guessing.
+    const costEl = el('div', 'bcost');
+    let affordable = true;
+    Object.entries(r.cost).forEach(([item, qty], i) => {
+      const have = state.me.inv[item] || 0;
+      const ok = have >= qty;
+      if (!ok) affordable = false;
+      costEl.append(el('span', ok ? 'ok' : 'miss',
+        `${i ? ' · ' : ''}${qty} ${itemName(item)}`));
+    });
+    b.append(costEl);
+    if (!affordable) b.classList.add('short');
     b.onclick = () => {
       state.build = state.build === kind ? null : kind;
       refreshBuildBar();
@@ -215,7 +228,7 @@ const HELP_HTML = `
 <p><span class="kbd">A</span>/<span class="kbd">D</span> move · <span class="kbd">Space</span> jump · <span class="kbd">click</span>/<span class="kbd">F</span> harvest &amp; attack</p>
 <p><span class="kbd">1</span>–<span class="kbd">4</span> tools · <span class="kbd">Tab</span> inventory &amp; crafting · <span class="kbd">Q</span> build bar · <span class="kbd">G</span> quick-eat</p>
 <p><span class="kbd">E</span> interact (light campfire / open box / feed dodo) · <span class="kbd">C</span> cook meat · <span class="kbd">X</span> demolish · <span class="kbd">T</span> dodo follow/stay</p>
-<p><span class="kbd">Enter</span> chat · <span class="kbd">H</span> close this help</p>
+<p><span class="kbd">R</span> ride a tamed parasaur · <span class="kbd">M</span> mute sounds · <span class="kbd">Enter</span> chat · <span class="kbd">H</span> close this help</p>
 <h3>The loop</h3>
 <p>Punch trees for thatch and wood, grab stones off the ground. Craft a Stone Axe
 and Pick — better tools mean way more resources per swing, just like ARK.</p>

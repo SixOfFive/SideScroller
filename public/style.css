@@ -67,14 +67,21 @@ canvas#game { position: fixed; inset: 0; display: block; }
 #buildBar {
   position: fixed; bottom: 96px; left: 50%; transform: translateX(-50%);
   display: flex; gap: 6px; z-index: 14;
+  flex-wrap: wrap; justify-content: center; max-width: 94vw;
 }
 #buildBar button {
-  padding: 8px 12px; font-size: 12px; cursor: pointer;
+  padding: 6px 10px; font-size: 12px; cursor: pointer;
   background: rgba(16, 21, 32, 0.92); color: #cfe0f5;
   border: 1px solid #33405c; border-radius: 6px;
+  text-align: center; max-width: 150px;
 }
 #buildBar button.sel { border-color: #ffd76e; color: #ffd76e; }
+#buildBar button.short .bname { opacity: 0.6; }
 #buildBar button:disabled { opacity: 0.4; }
+#buildBar .bname { font-weight: 600; margin-bottom: 2px; }
+#buildBar .bcost { font-size: 10px; line-height: 1.4; color: #8fa2c0; }
+#buildBar .bcost .ok { color: #9fce8f; }
+#buildBar .bcost .miss { color: #ff8484; font-weight: 700; }
 
 #toasts {
   position: fixed; bottom: 150px; left: 50%; transform: translateX(-50%);

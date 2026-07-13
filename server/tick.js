@@ -49,14 +49,19 @@ function step() {
     world.rolledNight = false;
   }
   for (const p of world.players.values()) {
-    if (settings.hunger) p.hunger = Math.max(0, p.hunger - HUNGER_DRAIN_PS * dt);
-    if (settings.hunger && p.hunger <= 0) {
-      p.hp -= STARVE_HP_PS * dt;
-      p.deathCause = 'starved';
-    } else if (p.hunger > REGEN_HUNGER_MIN && p.hp < STATS_MAX) {
-      p.hp = Math.min(STATS_MAX, p.hp + REGEN_HP_PS * dt);
+    // Death check FIRST: regen must never revive a 0-hp player before this
+    // runs (that bug pinned players at ~0 hp getting chewed forever).
+    if (p.hp <= 0) {
+      respawn(p);
+    } else {
+      if (settings.hunger) p.hunger = Math.max(0, p.hunger - HUNGER_DRAIN_PS * dt);
+      if (settings.hunger && p.hunger <= 0) {
+        p.hp -= STARVE_HP_PS * dt;
+        if (p.hp <= 0) { p.deathCause = 'starved'; respawn(p); }
+      } else if (p.hunger > REGEN_HUNGER_MIN && p.hp < STATS_MAX) {
+        p.hp = Math.min(STATS_MAX, p.hp + REGEN_HP_PS * dt);
+      }
     }
-    if (p.hp <= 0) respawn(p);
 
     const sig = `${Math.round(p.hp)}:${Math.round(p.hunger)}`;
     if (sig !== p.lastStatSig) {

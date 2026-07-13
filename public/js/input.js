@@ -25,6 +25,7 @@ const KEY_ACTIONS = {
   KeyH: 'toggleHelp',
   KeyT: 'dinoToggle',
   KeyR: 'mount',
+  KeyM: 'muteToggle',
   Enter: 'chat',
   Escape: 'escape',
   Digit1: 'equip1',
