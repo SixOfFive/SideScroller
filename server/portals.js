@@ -6,12 +6,19 @@
 import { world } from './state.js';
 import { REGIONS, regionEntranceX } from '../shared/regions.js';
 import { SPAWN_X } from '../shared/const.js';
-import { groundAt } from '../shared/terrain.js';
+import { groundAt, streamAt, STREAM_HALF } from '../shared/terrain.js';
 import { STRUCTURES } from '../shared/structures.js';
 
 const HUB0 = 1120, HUB_SPACING = 250;
 const HUB_HUE = 205;                       // return portals glow blue
 const DANGER_HUE = [140, 96, 56, 28, 4];   // outbound portals: green -> red
+
+// Nudge an x clear of any stream basin so portals never sit in (or land you in)
+// water. Deterministic since streamAt is seed-derived.
+function dryX(x) {
+  const s = streamAt(x);
+  return s ? Math.round(s.c + Math.sign(s.d || 1) * (STREAM_HALF + 60)) : x;
+}
 
 function makePortal(id, x, dest, label, hue) {
   const def = STRUCTURES.portal;
@@ -29,9 +36,9 @@ export function setupPortals() {
   for (let idx = 1; idx < REGIONS.length; idx++) {
     const region = REGIONS[idx];
     const hubX = HUB0 + (idx - 1) * HUB_SPACING;
-    const entrance = regionEntranceX(idx);
-    // outbound: hub -> region (land a little before the return portal)
-    const out = makePortal(`pt_h${idx}`, hubX, entrance - 150, region.name, DANGER_HUE[idx] ?? 0);
+    const entrance = dryX(regionEntranceX(idx)); // return portal on dry ground
+    // outbound: hub -> region (land a little before the return portal, dry)
+    const out = makePortal(`pt_h${idx}`, hubX, dryX(entrance - 150), region.name, DANGER_HUE[idx] ?? 0);
     // return: region entrance -> hub
     const back = makePortal(`pt_r${idx}`, entrance, SPAWN_X - 40, 'Hub', HUB_HUE);
     world.structures.set(out.id, out);

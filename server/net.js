@@ -130,6 +130,11 @@ function doJoin(ws, msg) {
 
 function leave(p) {
   if (!world.players.has(p.id)) return; // idempotent: takeover + close both call this
+  if (p.mount) { // release the mount so a stale binding can't capture a reconnect
+    const d = world.dinos.get(p.mount);
+    if (d && d.rider === p.name) { d.rider = null; d.state = d.owner ? 'follow' : 'idle'; }
+    p.mount = null;
+  }
   syncProfile(p);
   world.players.delete(p.id);
   broadcast({ t: 'pleave', id: p.id });

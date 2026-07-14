@@ -64,7 +64,9 @@ function doSwing() {
   const cx = meCenter();
   const equipped = ITEMS[state.me.equip];
   if (equipped && equipped.tool === 'gun') {
-    const dino = findNearestDino(800, (d) => !d.o);
+    // 700 to the dino's left edge keeps its CENTER under the server's 780 range
+    // even for a rex (w≈156), so a fired shot never bounces on the server.
+    const dino = findNearestDino(700, (d) => !d.o);
     if (!dino) { toast('No target in range'); return; } // don't waste bullets on air
     state.me.swingT = 0.2;
     state.me.face = Math.sign(dino.x + (DINODEFS[dino.sp]?.w || 40) / 2 - cx) || state.me.face;
@@ -98,7 +100,8 @@ function doInteract() {
   if (state.me.inWater) { sendMsg({ t: 'drink' }); return; }
 
   const s = findNearestStructure(INTERACT_RANGE + 30, ['storage_box', 'campfire', 'forge']);
-  const d = findNearestDino(INTERACT_RANGE + 30, (dd) => !dd.o);
+  // Only tameable dinos claim E — otherwise a nearby raptor would block your box.
+  const d = findNearestDino(INTERACT_RANGE + 30, (dd) => !dd.o && DINODEFS[dd.sp] && DINODEFS[dd.sp].tame);
   const sD = s ? Math.abs(s.x + STRUCTURES[s.kind].w / 2 - cx) : Infinity;
   const dD = d ? Math.abs(d.x - cx) : Infinity;
   if (d && dD < sD) { sendMsg({ t: 'feed', dino: d.i }); return; }

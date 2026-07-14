@@ -4,7 +4,18 @@
 
 import { world, newId } from './state.js';
 import { REGIONS, REGION_W, WORLD_W } from '../shared/regions.js';
+import { STRUCTURES } from '../shared/structures.js';
 import { groundAt, streamAt } from '../shared/terrain.js';
+
+// True if x falls within (padded) any existing structure — keeps re-rolled
+// nodes off player bases and portals. No-op during initial worldgen (empty).
+export function nearStructure(x, pad = 70) {
+  for (const s of world.structures.values()) {
+    const def = STRUCTURES[s.kind];
+    if (def && x > s.x - pad && x < s.x + def.w + pad) return true;
+  }
+  return false;
+}
 
 export const NODE_HP = { tree: 60, rock: 80, bush: 30, metal: 120 };
 const NODE_KINDS = ['tree', 'rock', 'bush', 'metal', null];
@@ -48,7 +59,7 @@ export function generateSpan(x0, x1, rand = Math.random) {
   while (x < end) {
     const region = REGIONS[Math.min(REGIONS.length - 1, Math.floor(x / REGION_W))];
     const kind = pick(rng, region.nodes);
-    if (kind && !streamAt(x)) {
+    if (kind && !streamAt(x) && !nearStructure(x)) {
       const n = makeNode(kind, x);
       world.nodes.set(n.id, n);
       made.push(n);

@@ -85,12 +85,23 @@ export function streamAt(x) {
   return null;
 }
 
+// Bank height: base terrain clamped to the on-screen band. Both the stream bed
+// and the water surface derive from this single reference so basins can't
+// collapse (the old code clamped the bed but not the surface, giving ~6px
+// puddles that were one tweak away from going dry).
+function bankAt(x) {
+  const y = groundBase(x);
+  return y < MIN_Y ? MIN_Y : y > MAX_Y ? MAX_Y : y;
+}
+
+const BED_MAX = 712; // basins dip below MAX_Y but stay just on-screen (<720)
+
 export function groundAt(x) {
   if (x < 0) x = 0; else if (x > WORLD_W) x = WORLD_W;
-  let y = groundBase(x);
+  let y = bankAt(x);
   const s = streamAt(x);
-  if (s) y += s.carve;
-  return y < MIN_Y ? MIN_Y : y > MAX_Y ? MAX_Y : y;
+  if (s) y = Math.min(y + s.carve, BED_MAX);
+  return y;
 }
 
 // Highest ground (smallest Y) beneath a footprint [x, x+w]; keeps a walker
@@ -99,11 +110,12 @@ export function groundTop(x, w) {
   return Math.min(groundAt(x + 3), groundAt(x + w / 2), groundAt(x + w - 3));
 }
 
-// Water surface Y at x, or null if no stream here. Flat across each basin.
+// Water surface Y at x, or null if no stream here. Flat across each basin,
+// derived from the clamped bank so surface is always above the bed.
 export function waterSurfaceAt(x) {
   const s = streamAt(x);
   if (!s) return null;
-  return groundBase(s.c) + STREAM_SURFACE;
+  return bankAt(s.c) + STREAM_SURFACE;
 }
 
 // Is a point (foot) submerged in a stream?
@@ -135,7 +147,7 @@ export function streamsIn(x0, x1) {
   for (let r = i0; r <= i1; r++) {
     const c = streamCenter(r);
     if (c + STREAM_HALF >= x0 && c - STREAM_HALF <= x1) {
-      out.push({ c, surface: groundBase(c) + STREAM_SURFACE });
+      out.push({ c, surface: bankAt(c) + STREAM_SURFACE });
     }
   }
   return out;

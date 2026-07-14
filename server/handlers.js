@@ -8,7 +8,7 @@ import {
 } from '../shared/const.js';
 import { inWater } from '../shared/terrain.js';
 import { world } from './state.js';
-import { toast, sendInv, sendStats, broadcast } from './net.js';
+import { send, toast, sendInv, sendStats, broadcast } from './net.js';
 import { invAdd, invRemove, invCount, invPayCost } from './inventory.js';
 import { harvest } from './harvest.js';
 import { build, demolish } from './building.js';
@@ -106,12 +106,25 @@ const HANDLERS = {
   // World settings from the ESC menu — co-op style, any survivor may adjust.
   setSettings(p, m) {
     const s = world.settings;
-    if (typeof m.hunger === 'boolean') s.hunger = m.hunger;
-    if (typeof m.thirst === 'boolean') s.thirst = m.thirst;
-    if (typeof m.damage === 'boolean') s.damage = m.damage;
-    if ([240, 480, 960].includes(m.dayLen)) s.dayLen = m.dayLen;
+    let changed = false;
+    for (const k of ['hunger', 'thirst', 'damage']) {
+      if (typeof m[k] === 'boolean' && s[k] !== m[k]) { s[k] = m[k]; changed = true; }
+    }
+    if ([240, 480, 960].includes(m.dayLen) && m.dayLen !== s.dayLen) {
+      // Preserve the current day phase so the nightfall gate can't jump and
+      // fire the chunk re-roll many times (or skip it) when day length changes.
+      const phase = (world.time % s.dayLen) / s.dayLen;
+      world.time = Math.floor(world.time / s.dayLen) * m.dayLen + phase * m.dayLen;
+      s.dayLen = m.dayLen;
+      changed = true;
+    }
+    if (!changed) return; // ignore no-op spam (chat-flood guard)
     broadcast({ t: 'settings', settings: s });
-    broadcast({ t: 'chat', from: '', text: `${p.name} changed the world settings.` });
+    const now = Date.now();
+    if (now - (p.lastSettingsMsg || 0) >= 800) {
+      p.lastSettingsMsg = now;
+      broadcast({ t: 'chat', from: '', text: `${p.name} changed the world settings.` });
+    }
   },
 
   harvest, build, demolish, use, attack, feed, dinoCmd, shoot,

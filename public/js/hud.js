@@ -41,11 +41,12 @@ function vitals(ctx) {
     bar(ctx, 16, y + 46, 190, 16, state.me.thirst / 100,
       state.me.thirst > 25 ? '#3a7bc9' : '#5aa2f0', `WATER ${Math.round(state.me.thirst)}`);
   }
+  const h = state.settings.hunger, w = state.settings.thirst;
   let warn = '';
-  if (state.me.hunger <= 0) warn = 'STARVING!';
-  else if (state.settings.thirst && state.me.thirst <= 0) warn = 'DYING OF THIRST!';
-  else if (state.me.hunger <= 20) warn = 'Hungry — eat something (G)';
-  else if (state.settings.thirst && state.me.thirst <= 20) warn = 'Thirsty — drink at a stream or eat berries';
+  if (h && state.me.hunger <= 0) warn = 'STARVING!';
+  else if (w && state.me.thirst <= 0) warn = 'DYING OF THIRST!';
+  else if (h && state.me.hunger <= 20) warn = 'Hungry — eat something (G)';
+  else if (w && state.me.thirst <= 20) warn = 'Thirsty — drink at a stream or eat berries';
   if (warn) {
     ctx.font = 'bold 12px sans-serif';
     ctx.textAlign = 'left';
@@ -112,7 +113,7 @@ function contextHint(ctx, W) {
     const portal = findNearestStructure(INTERACT_RANGE, ['portal']);
     if (portal) bits.push(`E enter ${portal.label} portal`);
     else if (state.me.inWater) bits.push('E drink');
-    const s = findNearestStructure(INTERACT_RANGE + 30, ['campfire', 'storage_box']);
+    const s = findNearestStructure(INTERACT_RANGE + 30, ['campfire', 'storage_box', 'forge']);
     if (s && s.kind === 'campfire') {
       const left = Math.max(0,
         Math.ceil(s.fuelS - (performance.now() - (s.fuelAt || performance.now())) / 1000));
@@ -120,6 +121,9 @@ function contextHint(ctx, W) {
       if (s.lit && (state.me.inv.raw_meat || 0) > 0) bits.push('C cook meat');
     }
     if (s && s.kind === 'storage_box') bits.push('E open box');
+    if (s && s.kind === 'forge') {
+      bits.push((state.me.inv.metal_ore || 0) > 0 ? 'E smelt ore' : 'E smelt (needs ore + wood)');
+    }
     const own = findNearestStructure(INTERACT_RANGE + 30);
     if (own && own.owner === state.name) bits.push('X demolish');
     if (state.me.mounted) {

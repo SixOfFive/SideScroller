@@ -11,6 +11,7 @@ import { groundAt } from '../shared/terrain.js';
 import { send, toast, sendInv, sendStats, broadcast } from './net.js';
 import { invAdd, invRemove } from './inventory.js';
 import { swingReady, playerTool } from './harvest.js';
+import { nearStructure } from './worldgen.js';
 
 const SPAWN_CHECK_S = 8;
 const REGION_TARGET = [4, 5, 6, 6, 6]; // wild dinos alive per region band
@@ -74,7 +75,12 @@ export function spawnDinosInSpan(x0, x1, count) {
   for (let k = 0; k < count; k++) {
     const sp = pickWeighted(region.dinos);
     const def = DINODEFS[sp];
-    const x = x0 + 80 + Math.random() * Math.max(1, x1 - x0 - 160);
+    let x = 0, ok = false;
+    for (let tries = 0; tries < 8; tries++) {
+      x = x0 + 80 + Math.random() * Math.max(1, x1 - x0 - 160);
+      if (!nearStructure(x, 150)) { ok = true; break; } // don't spawn onto a base
+    }
+    if (!ok) continue;
     const id = newId('d');
     world.dinos.set(id, {
       id, sp,
@@ -127,8 +133,31 @@ function armorReduction(p) {
   return Math.min(0.78, total / 90);
 }
 
+// Count living wild same-species dinos near d (including itself).
+function packCount(d) {
+  let n = 0;
+  const cx = dinoCenter(d);
+  for (const o of world.dinos.values()) {
+    if (o.owner || o.sp !== d.sp) continue;
+    if (Math.abs(dinoCenter(o) - cx) < 420) n++;
+  }
+  return n;
+}
+
+// How a hurt wild dino reacts: passives flee; timid packs flee when
+// outnumbered; everything else turns and hunts the attacker.
+function reactToAttack(d, def, p) {
+  if (def.behavior === 'passive' || (def.timid && packCount(d) < (def.packMin || 2))) {
+    d.state = 'flee'; d.fleeFrom = playerCenter(p); d.stateT = 4;
+    return;
+  }
+  d.provokedT = 8;
+  d.lastBite = Math.max(d.lastBite || 0, Date.now() - def.attackCd * 1000 + 250);
+}
+
 function bite(d, p, def, now) {
   d.lastBite = now;
+  if (!world.settings.damage) return; // peaceful mode: no bite damage to rider or mount
   // A mounted rider is shielded — the mount soaks the hit instead.
   if (p.mount && world.dinos.has(p.mount)) {
     const mount = world.dinos.get(p.mount);
@@ -137,7 +166,6 @@ function bite(d, p, def, now) {
     if (mount.hp <= 0) killDino(mount, null);
     return;
   }
-  if (!world.settings.damage) return;
   const dmg = def.dmg * (1 - armorReduction(p));
   p.hp = Math.max(0, p.hp - dmg);
   p.deathCause = def.name;
@@ -195,11 +223,18 @@ function stepTamed(d, def, dt, now) {
 }
 
 function stepAggressive(d, def, dt, now) {
-  const target = nearestPlayer(d, def.aggro);
+  // Being shot provokes a chase from beyond the normal aggro radius.
+  d.provokedT = Math.max(0, (d.provokedT || 0) - dt);
+  const range = d.provokedT > 0 ? Math.max(def.aggro, GUN_RANGE + 140) : def.aggro;
+  const target = nearestPlayer(d, range);
   if (target) {
     const dx = playerCenter(target) - dinoCenter(d);
+    // Vertical reach: only bite when the target's feet are near the dino's own
+    // footing, so a ground-pinned dino can't chew a player up on a wall/roof.
+    const dy = (target.y + PLAYER_H) - (d.y + def.h);
+    const inReach = Math.abs(dx) <= def.attackRange && dy > -(def.h + 30) && dy < PLAYER_H;
     d.face = Math.sign(dx) || d.face;
-    if (Math.abs(dx) <= def.attackRange) {
+    if (inReach) {
       d.state = 'attack';
       if (now - d.lastBite >= def.attackCd * 1000) bite(d, target, def, now);
     } else {
@@ -242,15 +277,21 @@ function stepRidden(d, def, dt) {
   d.x = Math.min(Math.max(d.x, 40), WORLD_W - 40 - def.w);
 
   const groundY = groundAt(d.x + def.w / 2) - def.h;
-  if (rider.rideJump && Math.abs(d.y - groundY) < 4) d.vy = -(def.rideJump || 700);
+  // Snap-down so a mount stays grounded walking downhill and can still jump.
+  const snap = Math.abs(dir) * (def.rideSpeed || def.speed) * dt * 2 + 4;
+  const onGround = d.y >= groundY - snap && (d.vy || 0) >= 0;
+  if (onGround) { d.y = groundY; d.vy = 0; }
+  if (rider.rideJump && onGround) d.vy = -(def.rideJump || 700);
   d.vy = Math.min((d.vy || 0) + GRAVITY * dt, 1400);
   d.y += d.vy * dt;
   if (d.y >= groundY) { d.y = groundY; d.vy = 0; }
 
-  // seat the rider on the dino's back
+  // seat the rider on the dino's back (keep their broadcast pose still)
   rider.x = d.x + (def.w - PLAYER_W) / 2;
   rider.y = d.y - PLAYER_H + 18;
   rider.face = d.face;
+  rider.vx = 0;
+  rider.anim = 'idle';
 }
 
 function stepDino(d, dt, now) {
@@ -275,7 +316,10 @@ function ownerOf(d) {
   return null;
 }
 function riderOf(d) {
-  for (const p of world.players.values()) if (p.name === d.rider) return p;
+  // Match on the live mount binding, not the stored name, so a reconnected
+  // same-name session (whose p.mount is null) can never be captured by a
+  // stale d.rider — the stepRidden self-heal then clears d.rider next tick.
+  for (const p of world.players.values()) if (p.mount === d.id) return p;
   return null;
 }
 function layEgg(d, def, now) {
@@ -312,15 +356,12 @@ export function attack(p, m) {
   if (!swingReady(p)) return;
   if (Math.abs(dinoCenter(d) - playerCenter(p)) > HARVEST_RANGE + DINODEFS[d.sp].w / 2) return;
 
-  d.hp -= WEAPON_DMG[playerTool(p)] || WEAPON_DMG.hand;
+  // A gun is not a melee weapon — pistol-whipping does bare-hand damage, no ammo.
+  const tool = playerTool(p);
+  d.hp -= (tool === 'gun' ? WEAPON_DMG.hand : WEAPON_DMG[tool]) || WEAPON_DMG.hand;
   if (d.tame > 0) d.tame = 0;
   const def = DINODEFS[d.sp];
-  // Passive things flee; aggressive things turn and fight (brief lunge back).
-  if (def.behavior === 'passive') {
-    d.state = 'flee'; d.fleeFrom = playerCenter(p); d.stateT = 4;
-  } else {
-    d.lastBite = Math.max(d.lastBite, Date.now() - def.attackCd * 1000 + 250);
-  }
+  reactToAttack(d, def, p);
   broadcast({ t: 'fx', kind: 'hit', x: dinoCenter(d), y: d.y + 10 });
   if (d.hp <= 0) killDino(d, p);
 }
@@ -332,21 +373,24 @@ export function shoot(p, m) {
   if (playerTool(p) !== 'gun') return;
   const now = Date.now();
   if (now - (p.lastShot || 0) < GUN_COOLDOWN_MS) return;
-  p.lastShot = now;
-  if (!invRemove(p.inv, 'bullet', 1)) { toast(p, 'Out of bullets'); return; }
-  sendInv(p);
-  const muzzleX = playerCenter(p) + p.face * 22, muzzleY = p.y + 22;
-  broadcast({ t: 'fx', kind: 'muzzle', x: muzzleX, y: muzzleY });
 
+  // Validate target + range BEFORE spending the bullet (no wasted ammo on a
+  // shot the server rejects for range).
   const d = world.dinos.get(m.dino);
   if (!d || d.owner) return;
-  const dist = Math.abs(dinoCenter(d) - playerCenter(p));
-  if (dist > GUN_RANGE) return;
+  if (Math.abs(dinoCenter(d) - playerCenter(p)) > GUN_RANGE) { toast(p, 'Out of range'); return; }
+  if ((p.inv.bullet || 0) < 1) { toast(p, 'Out of bullets'); return; }
+  p.lastShot = now;
+  invRemove(p.inv, 'bullet', 1);
+  sendInv(p);
+
+  const muzzleX = playerCenter(p) + p.face * 22, muzzleY = p.y + 22;
   const def = DINODEFS[d.sp];
+  broadcast({ t: 'fx', kind: 'muzzle', x: muzzleX, y: muzzleY });
   broadcast({ t: 'fx', kind: 'tracer', x: muzzleX, y: muzzleY, x2: dinoCenter(d), y2: d.y + def.h / 2 });
   d.hp -= WEAPON_DMG.gun;
   if (d.tame > 0) d.tame = 0;
-  if (def.behavior === 'passive') { d.state = 'flee'; d.fleeFrom = playerCenter(p); d.stateT = 4; }
+  reactToAttack(d, def, p); // aggressive dinos hunt the shooter; timid packs may flee
   broadcast({ t: 'fx', kind: 'hit', x: dinoCenter(d), y: d.y + def.h / 2 });
   if (d.hp <= 0) killDino(d, p);
 }
@@ -390,7 +434,11 @@ export function dinoCmd(p, m) {
   const d = world.dinos.get(m.dino);
   if (!d || d.owner !== p.name) return;
   const def = DINODEFS[d.sp];
-  if (m.cmd === 'stay') { d.state = 'stay'; d.rider = null; if (p.mount === d.id) p.mount = null; toast(p, `${d.name} will wait here`); }
+  if (m.cmd === 'stay') {
+    d.state = 'stay'; d.rider = null;
+    if (p.mount === d.id) { p.mount = null; send(p, { t: 'dismount' }); } // don't strand the rider
+    toast(p, `${d.name} will wait here`);
+  }
   else if (m.cmd === 'follow') { d.state = 'follow'; toast(p, `${d.name} is following you`); }
   else if (m.cmd === 'mount') {
     if (!def.rideable) { toast(p, `You can't ride a ${def.name}`); return; }

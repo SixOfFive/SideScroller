@@ -23,11 +23,15 @@ function ac() {
   return ctx;
 }
 
-export function toggleMute() {
-  muted = !muted;
+export function setMute(v) {
+  muted = !!v;
   localStorage.setItem('ss_mute', muted ? '1' : '0');
   if (master) master.gain.value = muted ? 0 : 0.32;
   return muted;
+}
+
+export function toggleMute() {
+  return setMute(!muted);
 }
 
 // 0..1 volume based on horizontal distance from the local player.

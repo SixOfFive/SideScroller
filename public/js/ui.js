@@ -2,7 +2,7 @@
 
 import { on, sendMsg } from './net.js';
 import { state } from './state.js';
-import { sfx, toggleMute } from './sound.js';
+import { sfx, setMute } from './sound.js';
 import { ITEMS, itemName, isArmor } from '/shared/items.js';
 import { RECIPES, CRAFTABLES, BUILDABLES } from '/shared/recipes.js';
 
@@ -289,7 +289,7 @@ function refreshOptions() {
   const mcb = el('input');
   mcb.type = 'checkbox';
   mcb.checked = localStorage.getItem('ss_mute') === '1';
-  mcb.onchange = () => toggleMute();
+  mcb.onchange = () => setMute(mcb.checked);
   muteRow.append(mcb, el('span', 'nm', 'Mute sounds (M)'));
   panel.append(muteRow);
 

@@ -25,6 +25,7 @@ function colliders() {
 
 export function stepLocal(me, dt, held) {
   const { solids, platforms } = colliders();
+  const wasGrounded = me.grounded; // for downhill snap-down
 
   const wading = inWater(me.x + PLAYER_W / 2, me.y + PLAYER_H);
   const speed = MOVE_SPEED * (me.speedMul || 1) * (wading ? WATER_SLOW : 1);
@@ -66,7 +67,11 @@ export function stepLocal(me, dt, held) {
       if (me.x + PLAYER_W <= r.x + 4 || me.x >= r.x + r.w - 4) continue;
       if (prevBottom <= r.y + 2 && ny + PLAYER_H >= r.y) landY = Math.min(landY, r.y);
     }
-    if (ny + PLAYER_H >= landY) {
+    // Snap down onto ground that dropped away this frame (walking downhill), so
+    // `grounded` doesn't flicker off and eat jump inputs. Fresh jumps have
+    // vy < 0 and skip this whole block.
+    const snap = wasGrounded ? Math.abs(me.vx) * dt * 2 + 3 : 0;
+    if (ny + PLAYER_H >= landY - snap) {
       ny = landY - PLAYER_H;
       me.vy = 0;
       me.grounded = true;
