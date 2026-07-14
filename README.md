@@ -6,6 +6,11 @@ build a thatch hut, light a campfire, cook food — and eventually tame dinosaur
 
 No install needed — players just open a web page.
 
+![SideScroller gameplay](docs/screenshots/gameplay.jpg)
+
+*Daytime in the Rocky Highlands: rolling terrain, a wild Parasaur, roaming dodos,
+and the survival HUD. All art and sound are generated at runtime — no asset files.*
+
 ## Running the server
 
 **Windows:** double-click **`start-server.bat`**. On first run it installs

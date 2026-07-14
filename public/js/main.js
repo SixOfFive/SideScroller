@@ -187,7 +187,24 @@ function updateHover() {
   state.hoverNode = best;
 }
 
-window.__game = { state, sendMsg, cam, screenToWorldX }; // debug/testing handle
+// debug/testing handle. pump() forces a few sim+render frames (useful when the
+// tab is backgrounded and rAF is throttled); snap() returns a downscaled JPEG
+// data URL of the current frame for capturing screenshots.
+window.__game = {
+  state, sendMsg, cam, screenToWorldX,
+  pump(n = 3) {
+    for (let i = 0; i < n; i++) {
+      if (state.me.mounted) rideAlong(); else stepLocal(state.me, 1 / 60, held);
+      render(1 / 60);
+    }
+  },
+  snap(w = 1024, h = 576, q = 0.86) {
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    c.getContext('2d').drawImage(canvas, 0, 0, w, h);
+    return c.toDataURL('image/jpeg', q);
+  },
+};
 
 // While mounted, the server owns the rider's position (seated on the dino);
 // the client just tracks the dino's interpolated position.
