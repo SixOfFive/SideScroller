@@ -8,13 +8,19 @@ No install needed — players just open a web page.
 
 ## Running the server
 
+**Windows:** double-click **`start-server.bat`**. On first run it installs
+dependencies automatically, then launches the server and prints the URLs.
+
+**Any platform (or from a terminal):**
+
 ```
 npm install
 npm start
 ```
 
 Then open `http://localhost:3000` in a browser. Other players on the same
-network connect to `http://<your-LAN-IP>:3000`.
+network connect to `http://<your-LAN-IP>:3000` (the server prints these on start).
+Close the window or press Ctrl+C to stop it.
 
 ## Tech
 

@@ -1,0 +1,10 @@
+
+  Starting SideScroller... open the URL below in your browser.
+  Press Ctrl+C or close this window to stop the server.
+
+loaded saved world
+portals: 8 placed (hub + returns)
+SideScroller server running:
+  http://localhost:3000
+  http://100.69.14.11:3000  (LAN)
+  http://192.168.15.102:3000  (LAN)
