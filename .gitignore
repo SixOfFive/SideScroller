@@ -1,4 +1,6 @@
 node_modules/
 data/
 *.log
+bat-out.txt
+bat-err.txt
 .claude/settings.local.json
