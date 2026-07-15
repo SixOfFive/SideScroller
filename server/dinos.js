@@ -692,7 +692,9 @@ export function brontoStash(p, m) {
     invAdd(p.inv, item, moved);
   } else return;
 
-  send(p, { t: 'brontoUpd', dino: d.id, inv: d.stash });
+  // Broadcast so a second survivor viewing the same bronto sees the change
+  // (client filters by the open dino id); the box panel does the same via supd.
+  broadcast({ t: 'brontoUpd', dino: d.id, inv: d.stash });
   sendInv(p);
 }
 

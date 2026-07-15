@@ -194,6 +194,7 @@ function refreshStorage() {
 
 export function openStorage(id) {
   storageOpenId = id;
+  brontoStash = null; // mutually exclusive with the bronto stash — don't let it hijack this panel
   $('storagePanel').classList.remove('hidden');
   refreshStorage();
 }

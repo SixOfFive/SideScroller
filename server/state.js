@@ -3,6 +3,9 @@
 import { readFileSync, writeFileSync, renameSync, mkdirSync, existsSync } from 'node:fs';
 import { DATA_DIR, SAVE_PATH, SAVE_TMP_PATH, MAX_PROFILES } from './config.js';
 import { EXP_BASE } from '../shared/regions.js';
+import { SPAWN_X } from '../shared/const.js';
+import { groundAt } from '../shared/terrain.js';
+import { DINODEFS } from '../shared/dinodefs.js';
 
 export const world = {
   nodes: new Map(),      // id -> {id, kind, x, hp, max, dep, depAt}
@@ -87,7 +90,15 @@ export function saveWorld() {
     nodes: [...world.nodes.values()].filter((n) => n.x < EXP_BASE),
     // portals are world fixtures rebuilt at boot; don't persist them
     structures: [...world.structures.values()].filter((s) => s.kind !== 'portal' && s.x < EXP_BASE),
-    dinos: [...world.dinos.values()].filter((d) => d.x < EXP_BASE),
+    // Wild expedition dinos are dropped, but an OWNED tame carried into the
+    // frontier is saved and snapped back to the hub (its zone won't exist on
+    // load), so a player never loses a bronto to a restart.
+    dinos: [...world.dinos.values()]
+      .filter((d) => d.x < EXP_BASE || d.owner)
+      .map((d) => (d.x < EXP_BASE ? d : {
+        ...d, x: SPAWN_X, y: groundAt(SPAWN_X + DINODEFS[d.sp].w / 2) - DINODEFS[d.sp].h,
+        state: 'follow', rider: null,
+      })),
     profiles: world.profiles,
     settings: world.settings,
   };

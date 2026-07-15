@@ -117,9 +117,16 @@ function doInteract() {
     return;
   }
   // Your own bronto's walking stash (kept after boxes/wild dinos so it never
-  // hijacks feeding a dino or opening a box you're standing at).
-  const bronto = findNearestDino(INTERACT_RANGE + 90,
-    (dd) => dd.o === state.name && DINODEFS[dd.sp] && DINODEFS[dd.sp].stash);
+  // hijacks feeding a dino or opening a box). Center-based reach to match the
+  // server — the bronto is 244px wide, so an edge-based check leaves its far
+  // half unreachable.
+  let bronto = null, bbd = Infinity;
+  for (const dd of state.dinos.values()) {
+    const def = DINODEFS[dd.sp];
+    if (dd.o !== state.name || !def || !def.stash) continue;
+    const dist = Math.abs(interp(dd).x + def.w / 2 - cx);
+    if (dist <= INTERACT_RANGE + def.w / 2 && dist < bbd) { bbd = dist; bronto = dd; }
+  }
   if (bronto) { sendMsg({ t: 'brontoStash', dino: bronto.i, action: 'open' }); return; }
   // Nothing to interact with here — but if a wild subdue-tame (trike/carno/…)
   // is right next to you, it looks feedable, so tell the player how: knock it

@@ -14,6 +14,7 @@ import { wireDinos } from './dinos.js';
 import {
   MAX_PLAYERS, NAME_MAX, SPAWN_X, PLAYER_H, WORLD_W, STATS_MAX,
 } from '../shared/const.js';
+import { EXP_BASE } from '../shared/regions.js';
 import { groundAt } from '../shared/terrain.js';
 
 const JOIN_TIMEOUT_MS = 10000;
@@ -92,12 +93,17 @@ function doJoin(ws, msg) {
   }
 
   const prof = world.profiles[key]; // re-read: leave() above may have synced it
+  // A saved position in transient expedition space (>= EXP_BASE) can't be
+  // restored — those zones regenerate only on warp, so the band would be empty
+  // with no way home. Drop such a returning survivor at the hub instead.
+  const savedOk = Number.isFinite(prof?.x) && prof.x < EXP_BASE;
+  const spawnX = savedOk ? prof.x : SPAWN_X + Math.random() * 200;
+  const spawnY = savedOk && Number.isFinite(prof?.y) ? prof.y : groundAt(spawnX + 14) - PLAYER_H;
   const p = {
     id: newId('p'), key, ws, tokenHash,
     name: prof && typeof prof.name === 'string' ? prof.name : name,
-    x: Number.isFinite(prof?.x) ? prof.x : SPAWN_X + Math.random() * 200,
-    y: Number.isFinite(prof?.y) ? prof.y
-      : groundAt(SPAWN_X + 100) - PLAYER_H - 40, // drop in just above the meadow
+    x: spawnX,
+    y: spawnY,
 
     vx: 0, face: 1, anim: 'idle',
     hp: Number.isFinite(prof?.stats?.hp) ? prof.stats.hp : STATS_MAX,

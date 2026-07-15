@@ -71,7 +71,7 @@ export const REGIONS = [
     key: 'volcano', name: 'Emberpeak', danger: 5, isle: true,
     baseY: 598, rough: 1.0, grass: [96, 68, 60],
     nodes: [0.06, 0.42, 0.02, 0.34, 0.16],
-    dinos: [{ sp: 'rex', w: 3 }, { sp: 'carno', w: 3 }, { sp: 'raptor', w: 2 }, { sp: 'giga', w: 1 }],
+    dinos: [{ sp: 'rex', w: 3 }, { sp: 'carno', w: 3 }, { sp: 'raptor', w: 2 }],
   },
 ];
 

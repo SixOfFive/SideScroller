@@ -76,13 +76,18 @@ export function ensureExpedition(depth) {
     world.dinos.set(d.id, d); dinoIds.push(d.id);
   }
 
-  // a Warp-Home portal (back to the hub) and a Descend portal (one deeper)
+  // a Warp-Home portal (back to the hub), and a Descend portal unless this is
+  // the deepest zone (a Descend at MAX_DEPTH would teleport past EXP_END into
+  // dead space with no zone to catch the player).
+  const portalIds = [];
   const home = expPortal(`xp_h${depth}`, x0 + EXP_W * 0.26, SPAWN_X - 40, 'Warp Home ▲', 205);
-  const descend = expPortal(`xp_d${depth}`, x0 + EXP_W * 0.74, expeditionEntranceX(depth + 1), `Descend ▼ D${depth + 1}`, 315);
-  world.structures.set(home.id, home); world.structures.set(descend.id, descend);
-  broadcast({ t: 'sadd', s: home }); broadcast({ t: 'sadd', s: descend });
+  world.structures.set(home.id, home); broadcast({ t: 'sadd', s: home }); portalIds.push(home.id);
+  if (depth < MAX_DEPTH) {
+    const descend = expPortal(`xp_d${depth}`, x0 + EXP_W * 0.74, expeditionEntranceX(depth + 1), `Descend ▼ D${depth + 1}`, 315);
+    world.structures.set(descend.id, descend); broadcast({ t: 'sadd', s: descend }); portalIds.push(descend.id);
+  }
 
-  const zone = { depth, x0, x1, nodes: nodeIds, dinos: dinoIds, portals: [home.id, descend.id] };
+  const zone = { depth, x0, x1, nodes: nodeIds, dinos: dinoIds, portals: portalIds };
   world.expeditions.set(depth, zone);
   console.log(`expedition: generated depth ${depth} (${nodeIds.length} nodes, ${dinoIds.length} dinos)`);
   return zone;
@@ -99,7 +104,19 @@ export function unloadEmptyExpeditions() {
     }
     if (occupied) continue;
     for (const id of zone.nodes) if (world.nodes.delete(id)) broadcast({ t: 'nrem', id });
-    for (const id of zone.dinos) world.dinos.delete(id);
+    // Sweep the WHOLE band, not just the ids we generated: a wild dino is
+    // deleted, but an owned tame left behind (e.g. on 'stay') is sent home
+    // rather than orphaned in a dead band or destroyed.
+    for (const [id, d] of world.dinos) {
+      const cx = d.x + DINODEFS[d.sp].w / 2;
+      if (cx < zone.x0 || cx >= zone.x1) continue;
+      if (d.owner) {
+        d.x = SPAWN_X; d.y = groundAt(SPAWN_X + DINODEFS[d.sp].w / 2) - DINODEFS[d.sp].h;
+        d.state = 'follow'; d.rider = null; d.guardId = null; d.dinoFoe = null;
+      } else {
+        world.dinos.delete(id);
+      }
+    }
     for (const id of zone.portals) if (world.structures.delete(id)) broadcast({ t: 'srem', id });
     world.expeditions.delete(depth);
     console.log(`expedition: unloaded empty depth ${depth}`);
