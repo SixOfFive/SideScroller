@@ -212,17 +212,70 @@ function killDino(d, byPlayer) {
 
 // --- per-dino step ----------------------------------------------------------
 
+// Guard duty: how close a hostile may get to the owner before the pet steps
+// in, when it breaks off, and how far from the owner it will chase.
+const GUARD_TRIGGER = 420;
+const GUARD_DISENGAGE = 700;
+const GUARD_LEASH = 900;
+
+function hostileNearPlayer(p, range) {
+  let best = null, bd = range;
+  const cx = playerCenter(p);
+  for (const o of world.dinos.values()) {
+    if (o.owner || DINODEFS[o.sp].behavior !== 'aggressive') continue;
+    const dist = Math.abs(dinoCenter(o) - cx);
+    if (dist < bd) { bd = dist; best = o; }
+  }
+  return best;
+}
+
+// A follow-mode pet intercepts hostiles that close on its owner. Uses the
+// client-known state strings ('chase'/'attack') so nothing new hits the wire.
+function stepGuard(d, def, dt, now, owner) {
+  const held = d.guardId ? world.dinos.get(d.guardId) : null;
+  const engaged = held && !held.owner
+    && Math.abs(dinoCenter(held) - playerCenter(owner)) < GUARD_DISENGAGE
+    && Math.abs(dinoCenter(d) - playerCenter(owner)) < GUARD_LEASH;
+  const target = engaged ? held : hostileNearPlayer(owner, GUARD_TRIGGER);
+  if (!target) { d.guardId = null; return false; }
+
+  d.guardId = target.id;
+  const dx = dinoCenter(target) - dinoCenter(d);
+  d.face = Math.sign(dx) || d.face;
+  const reach = (def.attackRange || 40) + DINODEFS[target.sp].w / 2;
+  if (Math.abs(dx) <= reach) {
+    d.state = 'attack';
+    if (now - (d.lastBite || 0) >= (def.attackCd || 1.2) * 1000) {
+      d.lastBite = now;
+      target.hp -= def.dmg || 5;
+      target.dinoFoe = d.id;  // the hostile turns on the pet
+      target.provokedT = 8;
+      broadcast({ t: 'fx', kind: 'hit', x: dinoCenter(target), y: target.y + 15 });
+      if (target.hp <= 0) killDino(target, owner); // owner collects the spoils
+    }
+  } else {
+    d.state = 'chase';
+    d.x += Math.sign(dx) * Math.max(def.speed * 1.6, 150) * dt;
+  }
+  return true;
+}
+
 function stepTamed(d, def, dt, now) {
   if (d.rider) return; // ridden movement handled separately
+  // Pets slowly mend outside/after their scraps.
+  if (d.hp < def.hp) d.hp = Math.min(def.hp, d.hp + 0.5 * dt);
   if (d.state !== 'stay') {
-    d.state = 'follow';
     const o = ownerOf(d);
-    if (o) {
-      const dx = playerCenter(o) - dinoCenter(d);
-      if (Math.abs(dx) > 1600) d.x = o.x - 80 * Math.sign(dx || 1);
-      else if (Math.abs(dx) > 100) {
-        d.face = Math.sign(dx);
-        d.x += Math.sign(dx) * Math.max(def.speed * 1.7, 160) * dt;
+    const guarding = o && world.settings.damage && stepGuard(d, def, dt, now, o);
+    if (!guarding) {
+      d.state = 'follow';
+      if (o) {
+        const dx = playerCenter(o) - dinoCenter(d);
+        if (Math.abs(dx) > 1600) d.x = o.x - 80 * Math.sign(dx || 1);
+        else if (Math.abs(dx) > 100) {
+          d.face = Math.sign(dx);
+          d.x += Math.sign(dx) * Math.max(def.speed * 1.7, 160) * dt;
+        }
       }
     }
   }
@@ -233,6 +286,35 @@ function stepTamed(d, def, dt, now) {
 function stepAggressive(d, def, dt, now) {
   // Being shot provokes a chase from beyond the normal aggro radius.
   d.provokedT = Math.max(0, (d.provokedT || 0) - dt);
+
+  // A guard pet that bit us is the priority target while the provocation
+  // lasts — fight the bodyguard, not the body.
+  const foe = d.dinoFoe ? world.dinos.get(d.dinoFoe) : null;
+  if (foe && foe.owner && d.provokedT > 0) {
+    const dx = dinoCenter(foe) - dinoCenter(d);
+    d.face = Math.sign(dx) || d.face;
+    if (Math.abs(dx) <= def.attackRange + DINODEFS[foe.sp].w / 2) {
+      d.state = 'attack';
+      if (now - d.lastBite >= def.attackCd * 1000 && world.settings.damage) {
+        d.lastBite = now;
+        foe.hp -= def.dmg;
+        broadcast({ t: 'fx', kind: 'hit', x: dinoCenter(foe), y: foe.y + 15 });
+        if (foe.hp <= 0) {
+          broadcast({ t: 'chat', from: '', text: `${foe.owner}'s ${foe.name} died protecting its owner.` });
+          killDino(foe, null);
+        }
+      }
+    } else {
+      d.state = 'chase';
+      let nx = d.x + Math.sign(dx) * def.speed * dt;
+      if (nx + def.w / 2 < SAFE_X) nx = SAFE_X - def.w / 2; // leash still holds
+      d.x = nx;
+    }
+    walkOnGround(d, def);
+    return;
+  }
+  if (!foe) d.dinoFoe = null; // guard died or de-spawned: back to hunting players
+
   const range = d.provokedT > 0 ? Math.max(def.aggro, GUN_RANGE + 140) : def.aggro;
   const target = nearestPlayer(d, range);
   if (target) {
@@ -433,8 +515,8 @@ export function feed(p, m) {
     if (def.egg) d.eggAt = now + randInt(def.egg[0], def.egg[1]) * 1000;
     broadcast({ t: 'chat', from: '', text: `${p.name} tamed a ${def.name}!` });
     toast(p, def.rideable
-      ? `${def.name} tamed! T follow/stay · R to ride.`
-      : `${def.name} tamed! It follows you — T to make it stay.`);
+      ? `${def.name} tamed! It guards you. T follow/stay · R to ride.`
+      : `${def.name} tamed! It follows and guards you — T to make it stay.`);
   }
 }
 

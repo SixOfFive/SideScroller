@@ -12,6 +12,9 @@ export const DINODEFS = {
     name: 'Dodo', w: 52, h: 44, threat: 0,
     hp: 40, speed: 55, fleeSpeed: 130,
     behavior: 'passive',
+    // Combat stats on passives are only used by TAMED guard duty — a wild
+    // dodo never bites anything.
+    dmg: 6, attackRange: 40, attackCd: 1.2,
     drops: { raw_meat: [2, 3], hide: [1, 2] },
     tame: { food: 'berry', feeds: 8, cooldownS: 8 },
     egg: [180, 300],
@@ -33,6 +36,8 @@ export const DINODEFS = {
     name: 'Parasaur', w: 104, h: 82, threat: 0,
     hp: 150, speed: 78, fleeSpeed: 165,
     behavior: 'passive',
+    // Tamed guard duty only: a tail swipe that can fight off a lone raptor.
+    dmg: 20, attackRange: 70, attackCd: 1.1,
     drops: { raw_meat: [3, 5], hide: [3, 5] },
     tame: { food: 'berry', feeds: 12, cooldownS: 7 },
     egg: [240, 360],

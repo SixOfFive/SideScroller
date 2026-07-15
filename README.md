@@ -55,6 +55,11 @@ Close the window or press Ctrl+C to stop it.
   rideable — press R). Compys and dilos are small but aggressive; raptors will
   shred anyone not in a full metal armor set; the T-Rex is best avoided until
   you've built a rifle.
+- **Tames guard you**: a following pet intercepts any hostile that closes in —
+  war dodos peck compys to death, a parasaur's tail can fight off a lone
+  raptor — and you loot whatever your bodyguard kills. Hostiles fight back
+  (pets can die protecting you), pets slowly mend afterward, and a pet told
+  to stay (T) holds its post instead.
 - Metal tier: forge smelts ore into ingots (charcoal byproduct) → metal tools,
   a full armor set (up to 78% damage reduction), gunpowder, bullets, rifle.
 - All sound is generated at runtime with WebAudio — no audio files. M mutes.
