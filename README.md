@@ -45,6 +45,9 @@ Close the window or press Ctrl+C to stop it.
 - Tool affinity and tiers matter: hands pull thatch, axes chop wood, picks mine
   stone/flint/ore — and metal tools harvest 1.7x. Fists < stone < spear < metal
   sword < rifle for damage.
+- Keys 1–4 are a hotbar: pin any tool to any key from the inventory (Tab);
+  unpinned slots automatically use the best tool you own (metal over stone,
+  rifle over sword over spear).
 - The island is five regions of rising danger: the safe Spawn Meadow hub,
   Whispering Forest, Rocky Highlands, Deep Wilds, and the Scorched Badlands.
   Portals at the hub jump you to each region's entrance; return portals bring

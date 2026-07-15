@@ -128,3 +128,6 @@ canvas#game { position: fixed; inset: 0; display: block; }
   min-width: 88px; font-family: monospace; font-size: 12px;
   border-bottom-width: 2px; /* echo the .kbd keycap look */
 }
+
+.slotbtn { min-width: 26px; padding: 2px 5px; font-size: 11px; font-family: monospace; }
+.slotbtn.sel { border-color: #ffd76e; color: #ffd76e; }

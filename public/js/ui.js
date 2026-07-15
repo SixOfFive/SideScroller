@@ -4,6 +4,7 @@ import { on, sendMsg } from './net.js';
 import { state } from './state.js';
 import { sfx, setMute } from './sound.js';
 import { labelFor, setBind, resetBinds } from './input.js';
+import { slotItem, slotOf, assignSlot, clearSlot } from './slots.js';
 import { ITEMS, itemName, isArmor } from '/shared/items.js';
 import { RECIPES, CRAFTABLES, BUILDABLES } from '/shared/recipes.js';
 
@@ -54,6 +55,12 @@ function refreshInv() {
   cols.append(left, right);
   panel.append(cols);
 
+  // What the hotbar keys currently equip (pins + smart fallbacks).
+  left.append(el('h3', '', 'Hotbar'));
+  left.append(el('p', 'cost', [1, 2, 3, 4]
+    .map((n) => `${labelFor('equip' + n)}: ${slotItem(n) === '' ? 'Hands' : itemName(slotItem(n))}`)
+    .join(' · ')));
+
   left.append(el('h3', '', 'Items'));
   const ids = ITEM_ORDER.filter((i) => state.me.inv[i]);
   if (!ids.length) left.append(el('p', 'cost', 'Nothing yet — punch a tree!'));
@@ -71,6 +78,16 @@ function refreshInv() {
       const b = el('button', '', equipped ? 'Unequip' : 'Equip');
       b.onclick = () => sendMsg({ t: 'equip', item: equipped ? '' : id });
       row.append(b);
+      // Pin this tool to a hotbar key; click the lit number again to unpin.
+      const cur = slotOf(id);
+      for (const n of [1, 2, 3, 4]) {
+        const sb = el('button', 'slotbtn' + (cur === n ? ' sel' : ''), labelFor('equip' + n));
+        sb.title = cur === n
+          ? `Unpin from key ${labelFor('equip' + n)}`
+          : `Equip with key ${labelFor('equip' + n)}`;
+        sb.onclick = () => { if (cur === n) clearSlot(n); else assignSlot(n, id); refreshInv(); };
+        row.append(sb);
+      }
     }
     if (def.armor) {
       const b = el('button', '', 'Wear');
@@ -237,7 +254,7 @@ const kbd = (a) => `<span class="kbd">${labelFor(a)}</span>`;
 const helpHTML = () => `
 <h2>How to survive</h2>
 <p>${kbd('moveLeft')}/${kbd('moveRight')} move · ${kbd('jump')} jump · <span class="kbd">click</span>/${kbd('swing')} harvest &amp; attack</p>
-<p>${kbd('equip1')}–${kbd('equip4')} tools · ${kbd('toggleInv')} inventory &amp; crafting · ${kbd('toggleBuild')} build bar · ${kbd('eatQuick')} quick-eat</p>
+<p>${kbd('equip1')}–${kbd('equip4')} tool hotbar (pin tools to keys from the inventory; unpinned slots use your best tool) · ${kbd('toggleInv')} inventory &amp; crafting · ${kbd('toggleBuild')} build bar · ${kbd('eatQuick')} quick-eat</p>
 <p>${kbd('interact')} interact (light campfire / open box / feed dodo) · ${kbd('cook')} cook meat · ${kbd('demolish')} demolish · ${kbd('dinoToggle')} dodo follow/stay</p>
 <p>${kbd('mount')} ride a tamed parasaur · ${kbd('muteToggle')} mute sounds · ${kbd('chat')} chat · <span class="kbd">Esc</span> options/quit · ${kbd('toggleHelp')} close this help</p>
 <p>Keep an eye on your <b>water bar</b> — drink from streams (${kbd('interact')} while standing in one) or eat berries.
@@ -268,8 +285,8 @@ const BIND_ROWS = [
   ['toggleBuild', 'Build menu'], ['toggleInv', 'Inventory'],
   ['cook', 'Cook meat'], ['demolish', 'Demolish'], ['eatQuick', 'Quick eat'],
   ['dinoToggle', 'Pet follow/stay'], ['mount', 'Ride mount'],
-  ['equip1', 'Hands (slot 1)'], ['equip2', 'Axe (slot 2)'],
-  ['equip3', 'Pick (slot 3)'], ['equip4', 'Spear (slot 4)'],
+  ['equip1', 'Tool slot 1'], ['equip2', 'Tool slot 2'],
+  ['equip3', 'Tool slot 3'], ['equip4', 'Tool slot 4'],
   ['chat', 'Chat'], ['muteToggle', 'Mute sounds'], ['toggleHelp', 'Help'],
 ];
 

@@ -14,6 +14,7 @@ import {
 } from './ui.js';
 import { initChat, focusChat } from './chat.js';
 import { initSound, toggleMute, sfx } from './sound.js';
+import { slotItem } from './slots.js';
 import { HARVEST_RANGE, INTERACT_RANGE, PLAYER_W, PLAYER_H, BUILD_REACH } from '/shared/const.js';
 import { STRUCTURES } from '/shared/structures.js';
 import { magneticPlacement } from '/shared/place.js';
@@ -57,8 +58,6 @@ on('joinErr', (m) => {
 on('welcome', () => joinEl.classList.add('hidden'));
 
 // --- actions -------------------------------------------------------------------
-
-const EQUIP_SLOTS = { equip1: '', equip2: 'stone_axe', equip3: 'stone_pick', equip4: 'spear' };
 
 function doSwing() {
   if (state.me.mounted || state.me.swingT > 0.05) return;
@@ -178,7 +177,9 @@ function processActions() {
         else toggleOptions(); // nothing open: ESC is the pause/options menu
         break;
       case 'equip1': case 'equip2': case 'equip3': case 'equip4':
-        sendMsg({ t: 'equip', item: EQUIP_SLOTS[a.type] });
+        // Slots resolve through slots.js: pinned item if owned, else the
+        // best of the slot's family ('' = bare hands).
+        sendMsg({ t: 'equip', item: slotItem(Number(a.type.slice(5))) });
         break;
     }
   }
