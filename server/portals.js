@@ -33,6 +33,15 @@ function dryX(x) {
   return s ? Math.round(s.c + Math.sign(s.d || 1) * (STREAM_HALF + 60)) : x;
 }
 
+// A dry landing spot for an outbound portal that stays clear of the return
+// portal at `entrance` — dryX can nudge a naive `entrance - 150` right back
+// onto it (dropping you on the return portal, one E from bouncing home).
+function landingFor(entrance) {
+  let x = dryX(entrance - 200);
+  if (Math.abs(x - entrance) < 140) x = dryX(entrance - 360); // stream shoved us back; step out further
+  return x;
+}
+
 function makePortal(id, x, dest, label, hue, isle) {
   const def = STRUCTURES.portal;
   return {
@@ -50,8 +59,8 @@ export function setupPortals() {
     const region = REGIONS[dst.idx];
     const hubX = HUB0 + k * HUB_SPACING;
     const entrance = dryX(regionEntranceX(dst.idx)); // return portal on dry ground
-    // outbound: hub -> destination (land a little before the return portal, dry)
-    const out = makePortal(`pt_h${dst.idx}`, hubX, dryX(entrance - 150), region.name, dst.hue, dst.isle);
+    // outbound: hub -> destination (land clear of the return portal, on dry ground)
+    const out = makePortal(`pt_h${dst.idx}`, hubX, landingFor(entrance), region.name, dst.hue, dst.isle);
     // return: destination entrance -> hub
     const back = makePortal(`pt_r${dst.idx}`, entrance, SPAWN_X - 40, 'Hub', HUB_HUE, false);
     world.structures.set(out.id, out);

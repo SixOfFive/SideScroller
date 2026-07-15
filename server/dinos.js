@@ -5,7 +5,7 @@
 import { world, newId } from './state.js';
 import { DINODEFS, WEAPON_DMG } from '../shared/dinodefs.js';
 import { ITEMS } from '../shared/items.js';
-import { REGIONS, REGION_W, clampStrait } from '../shared/regions.js';
+import { REGIONS, REGION_W, clampStrait, STRAIT_X0 } from '../shared/regions.js';
 import { WORLD_W, HARVEST_RANGE, INTERACT_RANGE, PLAYER_W, PLAYER_H, GRAVITY } from '../shared/const.js';
 import { groundAt } from '../shared/terrain.js';
 import { send, toast, sendInv, sendStats, broadcast } from './net.js';
@@ -65,7 +65,7 @@ function spawnDinoInRegion(idx) {
 // Remove wild (untamed) dinos whose center falls in [x0, x1).
 export function removeWildDinosIn(x0, x1) {
   for (const [id, d] of world.dinos) {
-    if (d.owner || d.rider) continue;
+    if (d.owner || d.rider || d.subdued) continue; // don't wipe an in-progress tame
     const c = dinoCenter(d);
     if (c >= x0 && c < x1) world.dinos.delete(id);
   }
@@ -179,6 +179,7 @@ const SUBDUE_WINDOW_MS = 22000; // knocked-out time; every feed refreshes it
 function subdue(d, def, byPlayer) {
   d.subdued = true;
   d.subduedUntil = Date.now() + SUBDUE_WINDOW_MS;
+  d.subduedBy = byPlayer ? byPlayer.name : null; // only the subduer may feed it
   d.state = 'idle';
   d.provokedT = 0;
   d.dinoFoe = null;
@@ -194,6 +195,7 @@ function stepSubdued(d, def, dt, now) {
   d.state = 'idle';
   if (now >= (d.subduedUntil || 0)) {
     d.subdued = false;
+    d.subduedBy = null;
     d.tame = Math.max(0, d.tame - 0.5); // lost most of the progress
     d.hp = Math.min(def.hp, d.hp + def.hp * 0.25);
     if (def.behavior === 'aggressive' || def.defensive) d.provokedT = 6;
@@ -265,7 +267,8 @@ function hostileNearPlayer(p, range) {
   let best = null, bd = range;
   const cx = playerCenter(p);
   for (const o of world.dinos.values()) {
-    if (o.owner || DINODEFS[o.sp].behavior !== 'aggressive') continue;
+    // Skip subdued dinos — never let a guard pet club its owner's would-be tame.
+    if (o.owner || o.subdued || DINODEFS[o.sp].behavior !== 'aggressive') continue;
     const dist = Math.abs(dinoCenter(o) - cx);
     if (dist < bd) { bd = dist; best = o; }
   }
@@ -278,7 +281,7 @@ function hostileNearPlayer(p, range) {
 // the wire. Returns true while it has the pet's turn (suppressing follow).
 function stepGuard(d, def, dt, now, owner) {
   const held = d.guardId ? world.dinos.get(d.guardId) : null;
-  const keep = held && !held.owner && held.state !== 'flee'
+  const keep = held && !held.owner && !held.subdued && held.state !== 'flee'
     && Math.abs(dinoCenter(held) - playerCenter(owner)) < GUARD_DISENGAGE
     && Math.abs(dinoCenter(d) - playerCenter(owner)) < GUARD_LEASH;
   const target = keep ? held : hostileNearPlayer(owner, GUARD_TRIGGER);
@@ -319,7 +322,10 @@ function stepTamed(d, def, dt, now) {
       d.state = 'follow';
       if (o) {
         const dx = playerCenter(o) - dinoCenter(d);
-        if (Math.abs(dx) > 1600) d.x = o.x - 80 * Math.sign(dx || 1);
+        // Long-range catch-up snap — but never across the strait (that would
+        // teleport a pet onto an isle with no portal). Same-side check.
+        const sameSide = (dinoCenter(d) < STRAIT_X0) === (playerCenter(o) < STRAIT_X0);
+        if (Math.abs(dx) > 1600) { if (sameSide) d.x = o.x - 80 * Math.sign(dx || 1); }
         else if (Math.abs(dx) > 100) {
           d.face = Math.sign(dx);
           d.x += Math.sign(dx) * Math.max(def.speed * 1.7, 160) * dt;
@@ -565,6 +571,11 @@ export function feed(p, m) {
   const subdueTame = def.tame.method === 'subdue';
   if (subdueTame && !d.subdued) {
     toast(p, `Knock the ${def.name.toLowerCase()} out first — wear it down, don't kill it.`);
+    return;
+  }
+  // The one who knocked it out claims the tame — no poaching another's subdue.
+  if (subdueTame && d.subduedBy && d.subduedBy !== p.name) {
+    toast(p, `${d.subduedBy} knocked this ${def.name.toLowerCase()} out — it's their tame.`);
     return;
   }
 
