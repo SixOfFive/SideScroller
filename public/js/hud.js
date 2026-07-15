@@ -179,8 +179,8 @@ const DANGER_COLOR = ['#a7d8a0', '#e6d27a', '#e8a24e', '#e8663e', '#ff3b3b',
   '#ff2b6d', '#e11d9c', '#c026d3', '#a021f0', '#7c3aed'];
 
 function regionInfo(ctx, W) {
-  const r = regionAt(state.me.x);
-  const d = r.danger || 0;
+  const r = bandAt(state.me.x);
+  const d = Math.min(DANGER_LABEL.length - 1, r.danger || 0);
   ctx.font = '700 13px sans-serif';
   ctx.textAlign = 'center';
   ctx.fillStyle = 'rgba(8,11,20,0.5)';
