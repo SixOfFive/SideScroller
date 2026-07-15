@@ -16,10 +16,10 @@ export const world = {
   nextId: 1,
   rolledNight: false,    // transient: has this night's chunk re-roll fired yet
   // World-wide rules, adjustable from the ESC options menu.
-  settings: { hunger: true, thirst: true, damage: true, dayLen: 480, bots: 3 },
+  settings: { hunger: true, thirst: true, damage: true, instantTame: false, dayLen: 480, bots: 3 },
 };
 
-export const DEFAULT_SETTINGS = { hunger: true, thirst: true, damage: true, dayLen: 480, bots: 3 };
+export const DEFAULT_SETTINGS = { hunger: true, thirst: true, damage: true, instantTame: false, dayLen: 480, bots: 3 };
 
 export function newId(prefix) {
   return prefix + world.nextId++;

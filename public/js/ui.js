@@ -339,6 +339,7 @@ function refreshOptions() {
   panel.append(settingRow('Hunger drain', 'hunger', 'off = food bar never drops'));
   panel.append(settingRow('Thirst drain', 'thirst', 'off = water bar never drops'));
   panel.append(settingRow('Dino damage', 'damage', 'off = wildlife can\'t hurt you'));
+  panel.append(settingRow('Instant tame', 'instantTame', 'on = one feed tames (subdue-tames still need a knockout first)'));
 
   const dayRow = el('div', 'itemrow');
   dayRow.append(el('span', 'nm', 'Day length'));

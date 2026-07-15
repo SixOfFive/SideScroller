@@ -594,7 +594,9 @@ export function feed(p, m) {
     return;
   }
   d.lastFedAt = now;
-  d.tame += 1 / def.tame.feeds;
+  // Instant-tame (ESC option, off by default): one feed finishes the job. For a
+  // subdue-tame you still have to knock it out first — this only skips the grind.
+  d.tame += world.settings.instantTame ? 1 : 1 / def.tame.feeds;
   if (subdueTame) {
     d.subduedUntil = now + SUBDUE_WINDOW_MS; // feeding keeps it under
   } else {
