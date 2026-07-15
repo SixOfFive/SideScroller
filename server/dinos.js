@@ -323,10 +323,15 @@ function stepTamed(d, def, dt, now) {
       if (o) {
         const dx = playerCenter(o) - dinoCenter(d);
         // Long-range catch-up snap — but never across the strait (that would
-        // teleport a pet onto an isle with no portal). Same-side check.
+        // teleport a pet onto an isle with no portal). Same-side check. Each pet
+        // gets a stable offset so a pack doesn't pile onto one point.
         const sameSide = (dinoCenter(d) < STRAIT_X0) === (playerCenter(o) < STRAIT_X0);
-        if (Math.abs(dx) > 1600) { if (sameSide) d.x = o.x - 80 * Math.sign(dx || 1); }
-        else if (Math.abs(dx) > 100) {
+        if (Math.abs(dx) > 1600) {
+          if (sameSide) {
+            const spread = ((parseInt(d.id.slice(1), 10) || 0) % 6) * 46;
+            d.x = o.x - (60 + spread) * Math.sign(dx || 1);
+          }
+        } else if (Math.abs(dx) > 100) {
           d.face = Math.sign(dx);
           d.x += Math.sign(dx) * Math.max(def.speed * 1.7, 160) * dt;
         }

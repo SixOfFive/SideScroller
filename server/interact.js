@@ -3,7 +3,8 @@
 import { world } from './state.js';
 import { isItem } from '../shared/items.js';
 import { STRUCTURES } from '../shared/structures.js';
-import { INTERACT_RANGE, PLAYER_W, PLAYER_H } from '../shared/const.js';
+import { INTERACT_RANGE, PLAYER_W, PLAYER_H, WORLD_W } from '../shared/const.js';
+import { DINODEFS } from '../shared/dinodefs.js';
 import { groundAt } from '../shared/terrain.js';
 import { send, toast, sendInv, broadcast } from './net.js';
 import { invAdd, invRemove, invCount } from './inventory.js';
@@ -26,10 +27,29 @@ export function use(p, m) {
     if (now - (p.lastTp || 0) < 1200) return; // no instant round-trips
     p.lastTp = now;
     const dx = Number(s.dest) || 0;
+
+    // Bring the player's FOLLOWING tames through the portal, fanned out beside
+    // the landing so they don't stack into one blob. Stay-mode pets hold their
+    // post and are left behind. A portal is the only legit way a pet crosses
+    // the strait (the follow-code's catch-up snap is blocked from crossing).
+    let k = 0;
+    for (const d of world.dinos.values()) {
+      if (d.owner !== p.name || d.state === 'stay') continue;
+      if (d.rider && d.rider !== p.name) continue; // someone else's ride — leave it
+      const def = DINODEFS[d.sp];
+      const off = (70 + (k % 6) * 52) * (k % 2 ? 1 : -1); // alternate sides, widen
+      const nx = Math.min(Math.max(dx + off, 40), WORLD_W - 40 - def.w);
+      d.x = nx;
+      d.y = groundAt(nx + def.w / 2) - def.h;
+      d.vy = 0; d.guardId = null; d.dinoFoe = null;
+      if (d.rider === p.name) { d.rider = null; d.state = 'follow'; } // dismount the ride
+      k++;
+    }
+
     p.x = dx;
     p.y = groundAt(dx + PLAYER_W / 2) - PLAYER_H;
     p.vx = 0;
-    if (p.mount) { const mt = world.dinos.get(p.mount); if (mt) mt.rider = null; p.mount = null; send(p, { t: 'dismount' }); }
+    if (p.mount) { p.mount = null; send(p, { t: 'dismount' }); }
     send(p, { t: 'tp', x: p.x, y: p.y, label: s.label });
     broadcast({ t: 'fx', kind: 'poof', x: p.x + PLAYER_W / 2, y: p.y + PLAYER_H / 2 });
     return;
