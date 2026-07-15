@@ -65,6 +65,10 @@ Close the window or press Ctrl+C to stop it.
   dodos, and push toward metal — dying and rebuilding just like everyone else.
   They eat, drink from streams, flee raptors, camp by their fires at night,
   and their progress persists in the world save.
+- **Raid the AI camps**: bots haul their surplus home into their storage
+  boxes — open one and rob the stash, or tear their camp down entirely
+  (bot structures are demolishable; player bases stay protected). They'll
+  grumble in chat and start rebuilding from scratch.
 
 ## Roadmap
 

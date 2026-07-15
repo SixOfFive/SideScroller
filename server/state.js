@@ -25,6 +25,19 @@ export function newId(prefix) {
   return prefix + world.nextId++;
 }
 
+// Sentinel tokenHash marking AI-survivor profiles (a real client token hashes
+// to 64 hex chars, so this can never collide with one).
+export const BOT_TOKEN = 'bot';
+
+// Is this survivor name an AI survivor (live or remembered)? Used to let
+// players raid bot camps while other players' bases stay protected.
+export function isBotName(name) {
+  const key = String(name).toLowerCase();
+  for (const p of world.players.values()) if (p.key === key) return !!p.bot;
+  const prof = world.profiles[key];
+  return !!prof && prof.tokenHash === BOT_TOKEN;
+}
+
 // Copy a live player's persistent fields back into their profile.
 export function syncProfile(p) {
   world.profiles[p.key] = {

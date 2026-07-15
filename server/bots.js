@@ -8,18 +8,19 @@
 // stamped with a sentinel tokenHash so a player can't hijack (or lose a
 // survivor name to) a bot, and vice versa.
 
-import { world, newId, syncProfile } from './state.js';
+import { world, newId, syncProfile, BOT_TOKEN } from './state.js';
 import { broadcast, wirePlayer } from './net.js';
 import { think, THINK_S } from './botbrain.js';
 import { WORLD_W, PLAYER_W, PLAYER_H, STATS_MAX, MOVE_SPEED } from '../shared/const.js';
 import { groundTop, streamsIn, STREAM_HALF } from '../shared/terrain.js';
 
-export const BOT_TOKEN = 'bot'; // sentinel: a real sha256 hex is never 3 chars
 export const MAX_BOTS = 4;
 
-// ARK Explorer-Notes survivors, homes spread across meadow/forest/highlands.
+// ARK Explorer-Notes survivors. Homes stay in survivable country (meadow edge
+// and forest) — deep-region camps just got the early bots killed on repeat.
+// The 4th dares the highlands edge.
 const BOT_NAMES = ['Helena', 'Rockwell', 'Mei Yin', 'Santiago', 'Raia', 'Dahkeya'];
-const HOME_SPOTS = [2620, 4460, 7080, 5540, 9740, 12160];
+const HOME_SPOTS = [2620, 4180, 5860, 6760, 9740, 12160];
 
 const BOT_SPEED = MOVE_SPEED * 0.85; // a touch slower than players, still outruns raptors
 
@@ -59,8 +60,8 @@ function spawnBot(idx) {
     mount: null, rideDir: 0, rideJump: false, deathCause: null,
     lastSwing: 0, lastChat: 0, lastShot: 0, lastStatSig: '',
     ai: {
-      home, moveTarget: null, goalId: '', swingT: 0,
-      fleeT: 0, fleeDir: -1, fails: {},
+      home, moveTarget: null, goalId: '', goalCost: null, swingT: 0,
+      fleeT: 0, fleeDir: -1, fails: {}, stash: false, dashT: 0, campWait: 0,
       thinkT: Math.random() * THINK_S,
       chatT: 90 + Math.random() * 150, greetT: 45,
     },

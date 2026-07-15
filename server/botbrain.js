@@ -5,6 +5,7 @@
 
 import { world } from './state.js';
 import { route } from './handlers.js';
+import { ITEMS, isItem } from '../shared/items.js';
 import { RECIPES } from '../shared/recipes.js';
 import { STRUCTURES } from '../shared/structures.js';
 import { DINODEFS } from '../shared/dinodefs.js';
@@ -123,12 +124,64 @@ function wanderNear(bot, x) {
   }
 }
 
+// --- the camp stash ---------------------------------------------------------------
+// Surplus goes into the bot's storage box — visible loot for anyone bold
+// enough to rob a camp. The active goal's cost overrides the keep floors so a
+// bot never stashes what it's about to spend (no deposit/withdraw churn).
+
+const KEEP = {
+  wood: 14, thatch: 25, stone: 20, flint: 6, fiber: 20,
+  berry: 30, cooked_meat: 6, raw_meat: 4, egg: 3, hide: 6,
+  metal_ore: 8, metal_ingot: 8, charcoal: 4,
+};
+const KEEP_DEFAULT = 5;
+
+// null = never stash (tools, armor, unknown ids).
+function keepFor(bot, item) {
+  if (!isItem(item) || ITEMS[item].tool || ITEMS[item].armor) return null;
+  return Math.max(KEEP[item] ?? KEEP_DEFAULT, bot.ai.goalCost?.[item] || 0);
+}
+
+// Haul surplus home. Returns true while the chore has the turn.
+function stashStep(bot) {
+  const box = ownedOfKind(bot, 'storage_box')[0];
+  if (!box || !box.inv) { bot.ai.stash = false; return false; }
+  const over = [];
+  let excess = 0;
+  for (const [item, qty] of Object.entries(bot.inv)) {
+    const keep = keepFor(bot, item);
+    if (keep == null || qty <= keep) continue;
+    over.push([item, qty - keep]);
+    excess += qty - keep;
+  }
+  if (!over.length) { bot.ai.stash = false; return false; }
+  if (!bot.ai.stash && excess < 15) return false; // not worth a trip yet
+  bot.ai.stash = true;
+  const bx = box.x + STRUCTURES.storage_box.w / 2;
+  if (goto(bot, bx, INTERACT_RANGE + 40)) {
+    const [item, qty] = over[0]; // one stack per think — looks deliberate
+    route(bot, { t: 'use', id: box.id, action: 'deposit', item, qty });
+  }
+  return true;
+}
+
 // --- acquiring resources --------------------------------------------------------
 
-// Work on the first shortfall in a cost object.
+// Work on the first shortfall in a cost object: camp stash first, then farm.
 function gatherFor(bot, cost) {
   for (const [item, qty] of Object.entries(cost)) {
-    if (invCount(bot.inv, item) < qty) { acquire(bot, item); return; }
+    const have = invCount(bot.inv, item);
+    if (have >= qty) continue;
+    const box = ownedOfKind(bot, 'storage_box')[0];
+    if (box && box.inv && (box.inv[item] || 0) > 0) {
+      const bx = box.x + STRUCTURES.storage_box.w / 2;
+      if (goto(bot, bx, INTERACT_RANGE + 40)) {
+        route(bot, { t: 'use', id: box.id, action: 'withdraw', item, qty: qty - have });
+      }
+      return;
+    }
+    acquire(bot, item);
+    return;
   }
 }
 
@@ -236,25 +289,25 @@ function tameStep(bot) {
 // eats through them, so mature bots keep hunting and foraging between projects.
 
 const GOALS = [
-  { id: 'axe',      done: (b) => haveTool(b, 'stone_axe', 'metal_axe'),
+  { id: 'axe',      recipe: 'stone_axe', done: (b) => haveTool(b, 'stone_axe', 'metal_axe'),
     step: (b) => craftStep(b, 'stone_axe') },
-  { id: 'pick',     done: (b) => haveTool(b, 'stone_pick', 'metal_pick'),
+  { id: 'pick',     recipe: 'stone_pick', done: (b) => haveTool(b, 'stone_pick', 'metal_pick'),
     step: (b) => craftStep(b, 'stone_pick') },
-  { id: 'campfire', done: (b) => countOwned(b, 'campfire') >= 1,
+  { id: 'campfire', recipe: 'campfire', done: (b) => countOwned(b, 'campfire') >= 1,
     step: (b) => buildStep(b, 'campfire', b.ai.home - 150, 'campfire') },
-  { id: 'spear',    done: (b) => haveTool(b, 'spear', 'sword'),
+  { id: 'spear',    recipe: 'spear', done: (b) => haveTool(b, 'spear', 'sword'),
     step: (b) => craftStep(b, 'spear') },
-  { id: 'fndA',     done: (b) => countOwned(b, 'foundation') >= 1,
+  { id: 'fndA',     recipe: 'foundation', done: (b) => countOwned(b, 'foundation') >= 1,
     step: (b) => buildStep(b, 'foundation', hutColX(b, 0), 'fndA') },
-  { id: 'fndB',     done: (b) => countOwned(b, 'foundation') >= 2,
+  { id: 'fndB',     recipe: 'foundation', done: (b) => countOwned(b, 'foundation') >= 2,
     step: (b) => buildStep(b, 'foundation', hutColX(b, 1), 'fndB') },
-  { id: 'wall',     done: (b) => countOwned(b, 'wall') >= 1,
+  { id: 'wall',     recipe: 'wall', done: (b) => countOwned(b, 'wall') >= 1,
     step: (b) => onOwnFoundation(b, 'wall', 0, 'wall') },
-  { id: 'door',     done: (b) => countOwned(b, 'doorframe') >= 1,
+  { id: 'door',     recipe: 'doorframe', done: (b) => countOwned(b, 'doorframe') >= 1,
     step: (b) => onOwnFoundation(b, 'doorframe', 1, 'door') },
-  { id: 'roofs',    done: (b) => countOwned(b, 'roof') >= 2,
+  { id: 'roofs',    recipe: 'roof', done: (b) => countOwned(b, 'roof') >= 2,
     step: (b) => onOwnFoundation(b, 'roof', countOwned(b, 'roof'), 'roofs') },
-  { id: 'box',      done: (b) => countOwned(b, 'storage_box') >= 1,
+  { id: 'box',      recipe: 'storage_box', done: (b) => countOwned(b, 'storage_box') >= 1,
     step: (b) => buildStep(b, 'storage_box', b.ai.home + 220, 'box') },
   { id: 'meat',     done: (b) => invCount(b.inv, 'cooked_meat') >= 4,
     step: (b) => cookedMeatStep(b) },
@@ -262,13 +315,13 @@ const GOALS = [
     step: (b) => acquire(b, 'berry') },
   { id: 'tame',     done: (b) => ownsDino(b),
     step: (b) => tameStep(b) },
-  { id: 'forge',    done: (b) => countOwned(b, 'forge') >= 1,
+  { id: 'forge',    recipe: 'forge', done: (b) => countOwned(b, 'forge') >= 1,
     step: (b) => buildStep(b, 'forge', b.ai.home - 280, 'forge') },
-  { id: 'mpick',    done: (b) => haveTool(b, 'metal_pick'),
+  { id: 'mpick',    recipe: 'metal_pick', done: (b) => haveTool(b, 'metal_pick'),
     step: (b) => craftStep(b, 'metal_pick') },
-  { id: 'maxe',     done: (b) => haveTool(b, 'metal_axe'),
+  { id: 'maxe',     recipe: 'metal_axe', done: (b) => haveTool(b, 'metal_axe'),
     step: (b) => craftStep(b, 'metal_axe') },
-  { id: 'sword',    done: (b) => haveTool(b, 'sword'),
+  { id: 'sword',    recipe: 'sword', done: (b) => haveTool(b, 'sword'),
     step: (b) => craftStep(b, 'sword') },
 ];
 
@@ -302,20 +355,29 @@ function needsStep(bot) {
 
 // Peeking out of the hub: predators that chased a bot to the safe line camp
 // there on their leash. If one lurks just across it, hold at a stand-off
-// distance instead of walking back into its jaws.
+// distance — but only so long. Campers can loiter for ages, so after ~20s of
+// waiting a healthy bot commits to a dash (dashT suppresses the flee reflex;
+// it outruns everything, at worst eating a bite or two on the way through).
 function leashGuard(bot) {
   const ai = bot.ai;
-  if (center(bot) >= REGION_W || ai.moveTarget == null || ai.moveTarget <= REGION_W) return;
+  if (ai.dashT > 0) return; // committed to the run
+  if (center(bot) >= REGION_W || ai.moveTarget == null || ai.moveTarget <= REGION_W) {
+    ai.campWait = 0;
+    return;
+  }
   for (const d of world.dinos.values()) {
     if (d.owner) continue;
     const def = DINODEFS[d.sp];
     if (def.behavior !== 'aggressive' || def.threat < 2) continue;
     const dx = dinoCx(d);
     if (dx > REGION_W - 80 && dx < REGION_W + 640) {
+      ai.campWait = (ai.campWait || 0) + THINK_S;
+      if (ai.campWait > 20 && bot.hp > 55) { ai.campWait = 0; ai.dashT = 12; return; }
       ai.moveTarget = Math.min(ai.moveTarget, REGION_W - 280);
       return;
     }
   }
+  ai.campWait = 0;
 }
 
 // After dark, stay near camp: pull far targets home and keep the fire fed.
@@ -380,8 +442,11 @@ export function think(bot) {
   const ai = bot.ai;
   chatTick(bot);
 
+  // Mid-dash through a camped border: keep running, ignore the fear.
+  if (ai.dashT > 0) ai.dashT -= THINK_S;
+
   // 1. danger: flee what would kill us, fight what won't
-  const threat = dangerNear(bot);
+  const threat = ai.dashT > 0 ? null : dangerNear(bot);
   if (threat) {
     const def = DINODEFS[threat.sp];
     const armed = haveTool(bot, ...WEAPONS);
@@ -412,13 +477,19 @@ export function think(bot) {
   // 2. survival needs
   if (needsStep(bot)) return;
 
-  // 3. the tech ladder (or idle patrol once everything is built)
+  // 3. pick the goal first so the stash chore knows what NOT to deposit
   const goal = GOALS.find((g) => !g.done(bot));
   ai.goalId = goal ? goal.id : 'idle';
-  if (goal) goal.step(bot);
-  else wanderNear(bot, ai.home);
+  ai.goalCost = goal && goal.recipe ? RECIPES[goal.recipe].cost : null;
 
-  // 4. after dark, pull it all back to camp; never exit the hub into a camper
+  // 4. haul surplus home to the storage box (loot for daring visitors),
+  //    otherwise work the ladder / idle patrol
+  if (!stashStep(bot)) {
+    if (goal) goal.step(bot);
+    else wanderNear(bot, ai.home);
+  }
+
+  // 5. after dark, pull it all back to camp; never exit the hub into a camper
   nightStep(bot);
   leashGuard(bot);
 }

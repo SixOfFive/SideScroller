@@ -1,7 +1,7 @@
 // Building placement and demolition. Placement geometry/support rules live in
 // shared/place.js so the client ghost and the server agree.
 
-import { world, newId } from './state.js';
+import { world, newId, isBotName } from './state.js';
 import { RECIPES } from '../shared/recipes.js';
 import { STRUCTURES } from '../shared/structures.js';
 import { computePlacement } from '../shared/place.js';
@@ -56,7 +56,9 @@ function supportsSomething(s) {
 export function demolish(p, m) {
   const s = world.structures.get(m.id);
   if (!s) return;
-  if (s.owner !== p.name) { toast(p, 'Not your structure'); return; }
+  // AI survivor camps are fair game — raid away, they'll rebuild. Other
+  // players' bases stay protected.
+  if (s.owner !== p.name && !isBotName(s.owner)) { toast(p, 'Not your structure'); return; }
   const def = STRUCTURES[s.kind];
   if (Math.abs(s.x + def.w / 2 - (p.x + PLAYER_W / 2)) > INTERACT_RANGE + 80) return;
   if (supportsSomething(s)) { toast(p, 'Something is built on top of it'); return; }
@@ -70,4 +72,13 @@ export function demolish(p, m) {
   broadcast({ t: 'srem', id: s.id });
   toast(p, `${STRUCTURES[s.kind].name} demolished (half refunded)`);
   sendInv(p);
+
+  // A raided AI survivor takes it personally (and then just rebuilds).
+  if (s.owner !== p.name) {
+    const bot = [...world.players.values()].find((o) => o.name === s.owner && o.bot);
+    if (bot) {
+      const lines = ['Hey — my camp!', `I saw that, ${p.name}.`, 'Fine. I\'ll build it again.'];
+      broadcast({ t: 'chat', from: bot.name, text: lines[Math.floor(Math.random() * lines.length)] });
+    }
+  }
 }
