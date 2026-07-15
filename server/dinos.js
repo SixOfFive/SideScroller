@@ -493,12 +493,23 @@ function layEgg(d, def, now) {
 // --- network wire -----------------------------------------------------------
 
 export function wireDinos() {
-  return [...world.dinos.values()].map((d) => ({
-    i: d.id, sp: d.sp,
-    x: Math.round(d.x), y: Math.round(d.y), f: d.face, s: d.state,
-    tm: Math.round(d.tame * 100) / 100, o: d.owner, h: Math.round(d.hp),
-    nm: d.name, r: d.rider ? 1 : 0, kd: d.subdued ? 1 : 0,
-  }));
+  const now = Date.now();
+  return [...world.dinos.values()].map((d) => {
+    const def = DINODEFS[d.sp];
+    // Feed cooldown remaining, in deciseconds (0 = ready). Only meaningful for a
+    // wild tameable you're actively feeding — drives the on-dino "feed in Ns" bar.
+    let fc = 0;
+    if (!d.owner && def.tame && d.lastFedAt) {
+      const rem = def.tame.cooldownS * 1000 - (now - d.lastFedAt);
+      if (rem > 0) fc = Math.round(rem / 100);
+    }
+    return {
+      i: d.id, sp: d.sp,
+      x: Math.round(d.x), y: Math.round(d.y), f: d.face, s: d.state,
+      tm: Math.round(d.tame * 100) / 100, o: d.owner, h: Math.round(d.hp),
+      nm: d.name, r: d.rider ? 1 : 0, kd: d.subdued ? 1 : 0, fc,
+    };
+  });
 }
 
 // --- message handlers -------------------------------------------------------

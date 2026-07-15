@@ -456,6 +456,20 @@ export function drawDino(ctx, x, y, d, br, t) {
     ctx.textAlign = 'center';
     ctx.fillText('taming…', cx, y - 17);
   }
+  // Feed cooldown: an amber "feed in Ns" bar over a wild dino that's still
+  // munching, so you know exactly when the next feed will take.
+  if (!d.o && d.fc > 0 && def.tame) {
+    const w = 46, bx = cx - w / 2, by = y - 26;
+    const frac = Math.max(0, Math.min(1, d.fc / (def.tame.cooldownS * 10)));
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.fillRect(bx - 1, by - 1, w + 2, 6);
+    ctx.fillStyle = '#f0b24e';
+    ctx.fillRect(bx, by, w * frac, 4);
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffd9a0';
+    ctx.fillText(`feed in ${(d.fc / 10).toFixed(1)}s`, cx, by - 4);
+  }
   if (!d.o) {
     if (d.kd) {
       // knocked out and ready to train: tell the player what to feed it
