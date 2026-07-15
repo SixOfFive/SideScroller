@@ -212,11 +212,14 @@ function killDino(d, byPlayer) {
 
 // --- per-dino step ----------------------------------------------------------
 
-// Guard duty: how close a hostile may get to the owner before the pet steps
-// in, when it breaks off, and how far from the owner it will chase.
-const GUARD_TRIGGER = 420;
-const GUARD_DISENGAGE = 700;
-const GUARD_LEASH = 900;
+// Guard duty. Trigger is deliberately LARGER than every hostile's aggro
+// (max 600, the rex) so a follow-mode pet peels off to intercept BEFORE the
+// threat reaches its owner, instead of reacting once the owner's already bitten.
+const GUARD_TRIGGER = 680;    // hostile-from-owner distance that wakes the guard
+const GUARD_DISENGAGE = 820;  // give up the current foe past this (owner-relative)
+const GUARD_LEASH = 1050;     // pet won't chase further than this from the owner
+const GUARD_RESIST = 0.35;    // pets tank better on duty, so they actually protect
+const GUARD_RANGE_PAD = 6;    // bite reach slack so contact isn't frame-perfect
 
 function hostileNearPlayer(p, range) {
   let best = null, bd = range;
@@ -229,33 +232,38 @@ function hostileNearPlayer(p, range) {
   return best;
 }
 
-// A follow-mode pet intercepts hostiles that close on its owner. Uses the
-// client-known state strings ('chase'/'attack') so nothing new hits the wire.
+// A follow-mode pet intercepts hostiles that close on its owner: it sprints in,
+// bites, and taunts the hostile onto itself so the owner can fight or flee.
+// Uses the client-known state strings ('chase'/'attack') so nothing new hits
+// the wire. Returns true while it has the pet's turn (suppressing follow).
 function stepGuard(d, def, dt, now, owner) {
   const held = d.guardId ? world.dinos.get(d.guardId) : null;
-  const engaged = held && !held.owner
+  const keep = held && !held.owner && held.state !== 'flee'
     && Math.abs(dinoCenter(held) - playerCenter(owner)) < GUARD_DISENGAGE
     && Math.abs(dinoCenter(d) - playerCenter(owner)) < GUARD_LEASH;
-  const target = engaged ? held : hostileNearPlayer(owner, GUARD_TRIGGER);
+  const target = keep ? held : hostileNearPlayer(owner, GUARD_TRIGGER);
   if (!target) { d.guardId = null; return false; }
 
   d.guardId = target.id;
   const dx = dinoCenter(target) - dinoCenter(d);
   d.face = Math.sign(dx) || d.face;
-  const reach = (def.attackRange || 40) + DINODEFS[target.sp].w / 2;
+  const reach = (def.attackRange || 40) + DINODEFS[target.sp].w / 2 + GUARD_RANGE_PAD;
   if (Math.abs(dx) <= reach) {
     d.state = 'attack';
+    // Keep the hostile locked onto the pet, refreshed every frame in contact —
+    // this is the "taunt" that pulls aggro off the owner.
+    target.dinoFoe = d.id;
+    target.provokedT = 8;
     if (now - (d.lastBite || 0) >= (def.attackCd || 1.2) * 1000) {
       d.lastBite = now;
       target.hp -= def.dmg || 5;
-      target.dinoFoe = d.id;  // the hostile turns on the pet
-      target.provokedT = 8;
       broadcast({ t: 'fx', kind: 'hit', x: dinoCenter(target), y: target.y + 15 });
       if (target.hp <= 0) killDino(target, owner); // owner collects the spoils
     }
   } else {
+    // Sprint to intercept — fast enough that the rush reads as protection.
     d.state = 'chase';
-    d.x += Math.sign(dx) * Math.max(def.speed * 1.6, 150) * dt;
+    d.x += Math.sign(dx) * Math.max(def.speed * 2.3, 300) * dt;
   }
   return true;
 }
@@ -297,7 +305,7 @@ function stepAggressive(d, def, dt, now) {
       d.state = 'attack';
       if (now - d.lastBite >= def.attackCd * 1000 && world.settings.damage) {
         d.lastBite = now;
-        foe.hp -= def.dmg;
+        foe.hp -= def.dmg * (1 - GUARD_RESIST); // pets shrug off some of it on duty
         broadcast({ t: 'fx', kind: 'hit', x: dinoCenter(foe), y: foe.y + 15 });
         if (foe.hp <= 0) {
           broadcast({ t: 'chat', from: '', text: `${foe.owner}'s ${foe.name} died protecting its owner.` });
