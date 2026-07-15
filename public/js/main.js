@@ -110,10 +110,24 @@ function doInteract() {
   const sD = s ? Math.abs(s.x + STRUCTURES[s.kind].w / 2 - cx) : Infinity;
   const dD = d ? Math.abs(d.x - cx) : Infinity;
   if (d && dD < sD) { sendMsg({ t: 'feed', dino: d.i }); return; }
-  if (!s) return;
-  if (s.kind === 'storage_box') openStorage(s.id);
-  else if (s.kind === 'forge') sendMsg({ t: 'use', id: s.id, action: 'smelt' });
-  else sendMsg({ t: 'use', id: s.id, action: 'fuel' });
+  if (s) {
+    if (s.kind === 'storage_box') openStorage(s.id);
+    else if (s.kind === 'forge') sendMsg({ t: 'use', id: s.id, action: 'smelt' });
+    else sendMsg({ t: 'use', id: s.id, action: 'fuel' });
+    return;
+  }
+  // Nothing to interact with here — but if a wild subdue-tame (trike/carno/…)
+  // is right next to you, it looks feedable, so tell the player how: knock it
+  // out first (E on a not-yet-KO'd one used to do nothing at all).
+  const ko = findNearestDino(INTERACT_RANGE + 30, (dd) => {
+    const def = DINODEFS[dd.sp];
+    return !dd.o && def && def.tame && def.tame.method === 'subdue' && !dd.kd;
+  });
+  if (ko) {
+    const nm = DINODEFS[ko.sp].name;
+    const food = DINODEFS[ko.sp].tame.food === 'berry' ? 'berries' : 'raw meat';
+    toast(`Knock the ${nm} out first (attack it — don't kill it), then feed it ${food}`);
+  }
 }
 
 function nearestOwnStructure() {
