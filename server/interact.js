@@ -4,8 +4,10 @@ import { world } from './state.js';
 import { isItem } from '../shared/items.js';
 import { STRUCTURES } from '../shared/structures.js';
 import { INTERACT_RANGE, PLAYER_W, PLAYER_H, WORLD_W } from '../shared/const.js';
+import { EXP_BASE, expeditionDepthAt, clampMove } from '../shared/regions.js';
 import { DINODEFS } from '../shared/dinodefs.js';
 import { groundAt } from '../shared/terrain.js';
+import { ensureExpedition } from './expeditions.js';
 import { send, toast, sendInv, broadcast } from './net.js';
 import { invAdd, invRemove, invCount } from './inventory.js';
 
@@ -28,6 +30,10 @@ export function use(p, m) {
     p.lastTp = now;
     const dx = Number(s.dest) || 0;
 
+    // Warping into expedition space? Generate that zone before we land so its
+    // nodes, dinos, and Descend/Home portals exist on arrival.
+    if (dx >= EXP_BASE) ensureExpedition(expeditionDepthAt(dx));
+
     // Bring the player's FOLLOWING tames through the portal, fanned out beside
     // the landing so they don't stack into one blob. Stay-mode pets hold their
     // post and are left behind. A portal is the only legit way a pet crosses
@@ -38,7 +44,7 @@ export function use(p, m) {
       if (d.rider && d.rider !== p.name) continue; // someone else's ride — leave it
       const def = DINODEFS[d.sp];
       const off = (70 + (k % 6) * 52) * (k % 2 ? 1 : -1); // alternate sides, widen
-      const nx = Math.min(Math.max(dx + off, 40), WORLD_W - 40 - def.w);
+      const nx = clampMove(dx + off, def.w, dx); // land inside the destination band
       d.x = nx;
       d.y = groundAt(nx + def.w / 2) - def.h;
       d.vy = 0; d.guardId = null; d.dinoFoe = null;

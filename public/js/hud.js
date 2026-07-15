@@ -7,7 +7,7 @@ import { worldTime } from './state.js';
 import { INTERACT_RANGE } from '/shared/const.js';
 import { DINODEFS } from '/shared/dinodefs.js';
 import { STRUCTURES } from '/shared/structures.js';
-import { regionAt } from '/shared/regions.js';
+import { bandAt } from '/shared/regions.js';
 
 const SLOTS = [
   { key: '1', item: '', label: 'Hands' },
@@ -173,8 +173,10 @@ function hoverInfo(ctx, W) {
   ctx.fillText(label, W / 2, 31);
 }
 
-const DANGER_LABEL = ['safe', 'low danger', 'dangerous', 'deadly', 'lethal'];
-const DANGER_COLOR = ['#a7d8a0', '#e6d27a', '#e8a24e', '#e8663e', '#ff3b3b'];
+const DANGER_LABEL = ['safe', 'low danger', 'dangerous', 'deadly', 'lethal',
+  'nightmarish', 'apex', 'hellish', 'abyssal', 'unfathomable'];
+const DANGER_COLOR = ['#a7d8a0', '#e6d27a', '#e8a24e', '#e8663e', '#ff3b3b',
+  '#ff2b6d', '#e11d9c', '#c026d3', '#a021f0', '#7c3aed'];
 
 function regionInfo(ctx, W) {
   const r = regionAt(state.me.x);

@@ -109,3 +109,71 @@ export function regionAt(x) {
 export function regionEntranceX(idx) {
   return idx * REGION_W + REGION_W * 0.5;
 }
+
+// --- the expedition frontier -----------------------------------------------
+// Past the fixed world lies an unwalkable buffer (EXP_GAP) and then endless
+// expedition zones, one EXP_W-wide band per depth, generated on demand and only
+// reachable by portal. Deeper = more dangerous, richer loot, and the only place
+// giga and wandering bronto dino-bases appear.
+export const EXP_GAP = REGION_W;            // unwalkable buffer after the fixed world
+export const EXP_BASE = WORLD_W + EXP_GAP;  // first expedition zone starts here
+export const EXP_W = REGION_W;              // one band per depth
+export const MAX_DEPTH = 48;                // generous cap; still reads as "forever"
+export const EXP_END = EXP_BASE + MAX_DEPTH * EXP_W;
+
+// Depth (1-based) of the zone at x, or 0 if x isn't in expedition space.
+export function expeditionDepthAt(x) {
+  return x >= EXP_BASE ? Math.min(MAX_DEPTH, Math.floor((x - EXP_BASE) / EXP_W) + 1) : 0;
+}
+export function expeditionZoneX0(depth) { return EXP_BASE + (depth - 1) * EXP_W; }
+export function expeditionEntranceX(depth) { return expeditionZoneX0(depth) + EXP_W * 0.5; }
+
+// Deterministic look for an expedition band (cycles palettes; danger climbs).
+const EXP_PALETTES = [[92, 74, 66], [70, 100, 74], [150, 152, 170], [116, 84, 60], [72, 86, 116], [104, 70, 96]];
+export function expeditionBand(depth) {
+  return {
+    key: 'exp', isExpedition: true, depth,
+    name: `Frontier — Depth ${depth}`,
+    danger: Math.min(9, 5 + depth),
+    grass: EXP_PALETTES[(depth - 1) % EXP_PALETTES.length],
+  };
+}
+
+// One band lookup for ANY x: a fixed region, the unwalkable gap, or an
+// expedition band. Client uses it for the HUD banner and ground tint.
+export function bandAt(x) {
+  if (x >= EXP_BASE) return expeditionBand(expeditionDepthAt(x));
+  if (x >= WORLD_W) return { key: 'gap', name: 'The Deep', danger: 0, barrier: true, grass: [40, 64, 96] };
+  return REGIONS[regionIndexAt(x)];
+}
+
+// Depth-scaled spawn tables for a generated expedition zone.
+export function expeditionDinoTable(depth) {
+  const t = [
+    { sp: 'raptor', w: 4 },
+    { sp: 'carno', w: 2 + Math.min(4, depth) },
+    { sp: 'rex', w: 1 + Math.min(5, depth) },
+    { sp: 'trike', w: 2 },
+    { sp: 'bronto', w: 2 },
+    { sp: 'sarco', w: 1 },
+  ];
+  if (depth >= 2) t.push({ sp: 'giga', w: Math.min(3, depth - 1) });
+  return t;
+}
+export function expeditionNodeWeights(depth) {
+  // [tree, rock, bush, metal, nothing] — richer metal the deeper you push.
+  const metal = Math.min(0.42, 0.16 + depth * 0.02);
+  return [0.16, 0.30, 0.06, metal, Math.max(0.06, 0.48 - metal)];
+}
+
+// Movement clamp for ANY position. `curX` is the mover's CURRENT authoritative
+// x and decides the domain, so input can never jump a mainland player into an
+// expedition (or vice versa) — only a portal (which writes x directly) crosses.
+export function clampMove(x, w, curX = x) {
+  if (curX < EXP_BASE) {                    // mainland / isles domain
+    x = Math.min(Math.max(x, 0), WORLD_W - w);
+    return clampStrait(x, w);
+  }
+  const z0 = expeditionZoneX0(expeditionDepthAt(curX)); // bounded to the current zone
+  return Math.min(Math.max(x, z0 + 40), z0 + EXP_W - 40 - w);
+}

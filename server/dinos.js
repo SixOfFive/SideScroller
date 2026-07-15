@@ -5,7 +5,7 @@
 import { world, newId } from './state.js';
 import { DINODEFS, WEAPON_DMG } from '../shared/dinodefs.js';
 import { ITEMS } from '../shared/items.js';
-import { REGIONS, REGION_W, clampStrait, STRAIT_X0 } from '../shared/regions.js';
+import { REGIONS, REGION_W, STRAIT_X0, clampMove } from '../shared/regions.js';
 import { WORLD_W, HARVEST_RANGE, INTERACT_RANGE, PLAYER_W, PLAYER_H, GRAVITY } from '../shared/const.js';
 import { groundAt } from '../shared/terrain.js';
 import { send, toast, sendInv, sendStats, broadcast } from './net.js';
@@ -111,7 +111,11 @@ function maybeSpawn(dt) {
   if (spawnAcc < SPAWN_CHECK_S) return;
   spawnAcc = 0;
   const counts = new Array(REGIONS.length).fill(0);
-  for (const d of world.dinos.values()) if (!d.owner) counts[regionOf(dinoCenter(d))]++;
+  // Expedition dinos (x >= WORLD_W) are managed by the expedition system, not
+  // the fixed-region top-up — don't let them skew the mainland counts.
+  for (const d of world.dinos.values()) {
+    if (!d.owner && dinoCenter(d) < WORLD_W) counts[regionOf(dinoCenter(d))]++;
+  }
   for (let i = 0; i < REGIONS.length; i++) {
     if (counts[i] < REGION_TARGET[i]) spawnDinoInRegion(i); // one per region per check
   }
@@ -233,8 +237,7 @@ function bite(d, p, def, now) {
 // --- movement helpers -------------------------------------------------------
 
 function walkOnGround(d, def) {
-  d.x = Math.min(Math.max(d.x, 40), WORLD_W - 40 - def.w);
-  d.x = clampStrait(d.x, def.w); // can't wade the impassable strait
+  d.x = clampMove(d.x, def.w, d.x); // in-bounds, out of the strait, inside its zone
   d.y = groundAt(d.x + def.w / 2) - def.h;
   d.vy = 0;
 }
@@ -430,8 +433,7 @@ function stepRidden(d, def, dt) {
   const dir = rider.rideDir || 0;
   if (dir) d.face = dir;
   d.x += dir * (def.rideSpeed || def.speed) * dt;
-  d.x = Math.min(Math.max(d.x, 40), WORLD_W - 40 - def.w);
-  d.x = clampStrait(d.x, def.w); // mounts can't cross the strait either
+  d.x = clampMove(d.x, def.w, d.x); // mounts stay in-bounds and in their zone/shore
 
   const groundY = groundAt(d.x + def.w / 2) - def.h;
   // Snap-down so a mount stays grounded walking downhill and can still jump.

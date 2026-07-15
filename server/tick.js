@@ -12,6 +12,7 @@ import { send, sendStats, broadcast, wirePlayer } from './net.js';
 import { updateDinos, wireDinos } from './dinos.js';
 import { updateBots } from './bots.js';
 import { rollUnoccupiedChunks } from './chunks.js';
+import { unloadEmptyExpeditions } from './expeditions.js';
 
 let tickCount = 0;
 
@@ -99,6 +100,9 @@ function step() {
       }
     }
   }
+
+  // Reclaim expedition zones nobody's in (every 4s) so the frontier stays cheap.
+  if (tickCount % (TICK_HZ * 4) === 0) unloadEmptyExpeditions();
 
   updateDinos(dt, now);
   updateBots(dt);

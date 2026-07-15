@@ -6,7 +6,7 @@ import { RECIPES } from '../shared/recipes.js';
 import {
   WORLD_W, PLAYER_W, PLAYER_H, CHAT_MAX, STATS_MAX, DRINK_AMOUNT,
 } from '../shared/const.js';
-import { clampStrait } from '../shared/regions.js';
+import { clampMove } from '../shared/regions.js';
 import { inWater } from '../shared/terrain.js';
 import { world } from './state.js';
 import { send, toast, sendInv, sendStats, broadcast } from './net.js';
@@ -29,9 +29,10 @@ const HANDLERS = {
       return;
     }
     const x = Number(m.x), y = Number(m.y);
-    // Clamp to the world, then out of the impassable strait (backstop for the
-    // client's own barrier — movement is client-authoritative).
-    if (Number.isFinite(x)) p.x = clampStrait(clamp(x, 0, WORLD_W - PLAYER_W), PLAYER_W);
+    // Domain-aware clamp: keeps a mainland player on the mainland and an
+    // expedition player inside their zone — input can't jump domains, only a
+    // portal can (backstop for the client's own barrier).
+    if (Number.isFinite(x)) p.x = clampMove(x, PLAYER_W, p.x);
     if (Number.isFinite(y)) p.y = clamp(y, -1200, 720); // terrain valleys reach ~606
     p.vx = clamp(Number(m.vx) || 0, -520, 520);
     p.face = m.f === -1 ? -1 : 1;

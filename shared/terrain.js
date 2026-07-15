@@ -3,7 +3,7 @@
 // dinos re-roll at night. groundAt(x) returns the surface Y in world px
 // (smaller Y = higher ground). Streams carve basins that hold water.
 
-import { WORLD_W, REGIONS, REGION_W } from './regions.js';
+import { WORLD_W, REGIONS, REGION_W, EXP_BASE, EXP_END, expeditionDepthAt, expeditionBand } from './regions.js';
 
 const TERRAIN_SEED = 1337;
 const SEG = 240;                 // px between terrain control points
@@ -97,7 +97,10 @@ function bankAt(x) {
 const BED_MAX = 712; // basins dip below MAX_Y but stay just on-screen (<720)
 
 export function groundAt(x) {
-  if (x < 0) x = 0; else if (x > WORLD_W) x = WORLD_W;
+  // Terrain now extends across the expedition frontier too; only clamp at the
+  // far cap. Value noise continues rolling; region params clamp to the deepest
+  // fixed band, so expeditions read as rugged frontier terrain.
+  if (x < 0) x = 0; else if (x > EXP_END) x = EXP_END;
   let y = bankAt(x);
   const s = streamAt(x);
   if (s) y = Math.min(y + s.carve, BED_MAX);
@@ -126,6 +129,7 @@ export function inWater(x, footY) {
 
 // Region grass color, smoothly blended between region centers.
 export function grassAt(x) {
+  if (x >= EXP_BASE) return expeditionBand(expeditionDepthAt(x)).grass; // frontier tint by depth
   const c = x / REGION_W - 0.5;
   const i = Math.max(0, Math.min(REGIONS.length - 1, Math.floor(c)));
   const j = Math.max(0, Math.min(REGIONS.length - 1, i + 1));

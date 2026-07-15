@@ -3,6 +3,7 @@
 // the player horizontally.
 
 import { PLAYER_W } from '/shared/const.js';
+import { EXP_END } from '/shared/regions.js';
 import { state } from './state.js';
 
 export const VIEW_H = 720;
@@ -12,7 +13,9 @@ export function updateCamera(canvas) {
   cam.scale = canvas.height / VIEW_H;
   cam.viewW = canvas.width / cam.scale;
   const target = state.me.x + PLAYER_W / 2 - cam.viewW / 2;
-  const max = Math.max(0, state.worldW - cam.viewW);
+  // Camera can follow all the way into the expedition frontier, not just the
+  // fixed world — otherwise a warped-in player sits off the right edge.
+  const max = Math.max(0, EXP_END - cam.viewW);
   cam.x = Math.min(Math.max(target, 0), max);
 }
 

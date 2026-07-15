@@ -2,6 +2,7 @@
 
 import { readFileSync, writeFileSync, renameSync, mkdirSync, existsSync } from 'node:fs';
 import { DATA_DIR, SAVE_PATH, SAVE_TMP_PATH, MAX_PROFILES } from './config.js';
+import { EXP_BASE } from '../shared/regions.js';
 
 export const world = {
   nodes: new Map(),      // id -> {id, kind, x, hp, max, dep, depAt}
@@ -14,6 +15,9 @@ export const world = {
   profiles: Object.create(null),
   time: 60,              // world clock in seconds (day cycle uses modulo)
   nextId: 1,
+  // Active expedition zones: depth -> {depth, x0, x1, nodes:[ids], dinos:[ids],
+  // portals:[ids]}. Transient — generated on warp, unloaded when empty, never saved.
+  expeditions: new Map(),
   rolledNight: false,    // transient: has this night's chunk re-roll fired yet
   // World-wide rules, adjustable from the ESC options menu.
   settings: { hunger: true, thirst: true, damage: true, instantTame: false, dayLen: 480, bots: 3 },
@@ -79,10 +83,11 @@ export function saveWorld() {
     v: SAVE_VERSION,
     time: world.time,
     nextId: world.nextId,
-    nodes: [...world.nodes.values()],
+    // Expedition entities (x >= EXP_BASE) are transient — never persist them.
+    nodes: [...world.nodes.values()].filter((n) => n.x < EXP_BASE),
     // portals are world fixtures rebuilt at boot; don't persist them
-    structures: [...world.structures.values()].filter((s) => s.kind !== 'portal'),
-    dinos: [...world.dinos.values()],
+    structures: [...world.structures.values()].filter((s) => s.kind !== 'portal' && s.x < EXP_BASE),
+    dinos: [...world.dinos.values()].filter((d) => d.x < EXP_BASE),
     profiles: world.profiles,
     settings: world.settings,
   };

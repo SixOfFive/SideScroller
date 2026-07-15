@@ -7,7 +7,7 @@
 // rebuild deterministically at every boot and never collide with player builds.
 
 import { world } from './state.js';
-import { REGIONS, regionEntranceX } from '../shared/regions.js';
+import { REGIONS, regionEntranceX, expeditionEntranceX } from '../shared/regions.js';
 import { SPAWN_X } from '../shared/const.js';
 import { groundAt, streamAt, STREAM_HALF } from '../shared/terrain.js';
 import { STRUCTURES } from '../shared/structures.js';
@@ -66,5 +66,14 @@ export function setupPortals() {
     world.structures.set(out.id, out);
     world.structures.set(back.id, back);
   });
-  console.log(`portals: ${DESTS.length * 2} placed (${DESTS.filter((d) => d.isle).length} isle + ${DESTS.filter((d) => !d.isle).length} frontier + returns)`);
+
+  // The frontier gateway: hub -> the first expedition zone. Its destination is
+  // in expedition space, so interact.js generates the zone (and each Descend
+  // portal deeper) on use. Warp-home portals live inside each generated zone.
+  const expX = HUB0 + DESTS.length * HUB_SPACING;
+  const gateway = makePortal('pt_exp', expX, expeditionEntranceX(1), 'Expedition ▶', 328, false);
+  gateway.frontier = true;
+  world.structures.set(gateway.id, gateway);
+
+  console.log(`portals: ${DESTS.length * 2 + 1} placed (${DESTS.filter((d) => d.isle).length} isle + ${DESTS.filter((d) => !d.isle).length} frontier + returns + expedition gateway)`);
 }
