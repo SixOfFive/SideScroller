@@ -200,7 +200,49 @@ export function openStorage(id) {
 
 export function closeStorage() {
   storageOpenId = null;
+  brontoStash = null;
   $('storagePanel').classList.add('hidden');
+}
+
+// --- bronto stash (the mobile base's walking chest) -------------------------
+// Self-contained so it can never disturb the storage-box panel, and purely
+// event-driven (opens on E / updates on server reply — never per frame).
+let brontoStash = null; // { dino, name, inv }
+
+function brontoRow(list, id, qty, dir) {
+  const row = el('div', 'itemrow');
+  row.append(el('span', 'qty', `×${qty}`), el('span', 'nm', itemName(id)));
+  const push = (n) => sendMsg({ t: 'brontoStash', dino: brontoStash.dino, action: dir, item: id, qty: n });
+  const b10 = el('button', '', dir === 'deposit' ? '→ 10' : '← 10'); b10.onclick = () => push(10);
+  const b1 = el('button', '', dir === 'deposit' ? '→ 1' : '← 1'); b1.onclick = () => push(1);
+  row.append(b1, b10);
+  list.append(row);
+}
+
+function refreshBrontoStash() {
+  if (!brontoStash) return;
+  const panel = $('storagePanel');
+  panel.replaceChildren();
+  panel.append(el('h2', '', `${brontoStash.name} — stash`));
+  const cols = el('div', 'cols');
+  const mine = el('div'), stash = el('div');
+  cols.append(mine, stash);
+  panel.append(cols);
+  mine.append(el('h3', '', 'Your items → stow'));
+  for (const id of ITEM_ORDER.filter((i) => state.me.inv[i])) brontoRow(mine, id, state.me.inv[id], 'deposit');
+  stash.append(el('h3', '', 'On the bronto → take'));
+  const inv = brontoStash.inv || {};
+  const ids = ITEM_ORDER.filter((i) => inv[i]);
+  if (!ids.length) stash.append(el('p', 'cost', 'Empty. Ride it out and stock it up.'));
+  for (const id of ids) brontoRow(stash, id, inv[id], 'withdraw');
+  panel.append(el('p', 'cost', 'Esc to close'));
+}
+
+function openBrontoStash(dino, name, inv) {
+  brontoStash = { dino, name, inv };
+  storageOpenId = null; // this panel is a dino stash, not a box
+  $('storagePanel').classList.remove('hidden');
+  refreshBrontoStash();
 }
 
 // --- build bar -------------------------------------------------------------------
@@ -427,9 +469,11 @@ export function closeAllPanels() {
 export function initUI() {
   on('toast', (m) => toast(m.msg));
   on('settings', () => refreshOptions());
-  on('inv', () => { refreshInv(); refreshStorage(); refreshBuildBar(); });
+  on('inv', () => { refreshInv(); refreshStorage(); refreshBrontoStash(); refreshBuildBar(); });
   on('supd', (m) => { if (m.s.id === storageOpenId) refreshStorage(); });
   on('srem', (m) => { if (m.id === storageOpenId) closeStorage(); });
+  on('brontoOpen', (m) => openBrontoStash(m.dino, m.name, m.inv));
+  on('brontoUpd', (m) => { if (brontoStash && brontoStash.dino === m.dino) { brontoStash.inv = m.inv; refreshBrontoStash(); } });
   on('dead', () => toast('You died! Back at the beach.'));
   on('disconnect', () => {
     if (!state.joined) return; // pre-join refusal: keep the real joinErr message

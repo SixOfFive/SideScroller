@@ -116,6 +116,11 @@ function doInteract() {
     else sendMsg({ t: 'use', id: s.id, action: 'fuel' });
     return;
   }
+  // Your own bronto's walking stash (kept after boxes/wild dinos so it never
+  // hijacks feeding a dino or opening a box you're standing at).
+  const bronto = findNearestDino(INTERACT_RANGE + 90,
+    (dd) => dd.o === state.name && DINODEFS[dd.sp] && DINODEFS[dd.sp].stash);
+  if (bronto) { sendMsg({ t: 'brontoStash', dino: bronto.i, action: 'open' }); return; }
   // Nothing to interact with here — but if a wild subdue-tame (trike/carno/…)
   // is right next to you, it looks feedable, so tell the player how: knock it
   // out first (E on a not-yet-KO'd one used to do nothing at all).

@@ -14,7 +14,7 @@ import { invAdd, invRemove, invCount, invPayCost } from './inventory.js';
 import { harvest } from './harvest.js';
 import { build, demolish } from './building.js';
 import { use } from './interact.js';
-import { attack, feed, dinoCmd, setRideInput, shoot, bardDino } from './dinos.js';
+import { attack, feed, dinoCmd, setRideInput, shoot, bardDino, brontoStash } from './dinos.js';
 
 const ARMOR_SLOTS = ['head', 'chest', 'legs', 'feet'];
 
@@ -136,7 +136,7 @@ const HANDLERS = {
     }
   },
 
-  harvest, build, demolish, use, attack, feed, dinoCmd, shoot, bardDino,
+  harvest, build, demolish, use, attack, feed, dinoCmd, shoot, bardDino, brontoStash,
 };
 
 export function route(p, msg) {

@@ -4,12 +4,12 @@
 
 import { world, newId } from './state.js';
 import { DINODEFS, WEAPON_DMG } from '../shared/dinodefs.js';
-import { ITEMS } from '../shared/items.js';
+import { ITEMS, isItem } from '../shared/items.js';
 import { REGIONS, REGION_W, STRAIT_X0, clampMove } from '../shared/regions.js';
 import { WORLD_W, HARVEST_RANGE, INTERACT_RANGE, PLAYER_W, PLAYER_H, GRAVITY } from '../shared/const.js';
 import { groundAt } from '../shared/terrain.js';
 import { send, toast, sendInv, sendStats, broadcast } from './net.js';
-import { invAdd, invRemove } from './inventory.js';
+import { invAdd, invRemove, invCount } from './inventory.js';
 import { swingReady, playerTool } from './harvest.js';
 import { nearStructure } from './worldgen.js';
 
@@ -659,6 +659,41 @@ export function bardDino(p, m) {
   best.barding = item;
   sendInv(p);
   toast(p, `${best.name} is wearing ${ITEMS[item].name}`);
+}
+
+// The bronto's built-in stash — a walking chest. Shared like a storage box
+// (anyone in reach can use it), opened with E. Event-driven: 'open' returns the
+// contents, 'deposit'/'withdraw' move a stack and return the updated stash.
+export function brontoStash(p, m) {
+  const d = world.dinos.get(m.dino);
+  if (!d || !d.owner) return;
+  const def = DINODEFS[d.sp];
+  if (!def.stash) return;
+  if (Math.abs(dinoCenter(d) - playerCenter(p)) > INTERACT_RANGE + def.w / 2) {
+    toast(p, `Get closer to the ${def.name.toLowerCase()}`); return;
+  }
+  d.stash = d.stash || {};
+  if (m.action === 'open') { send(p, { t: 'brontoOpen', dino: d.id, name: d.name, inv: d.stash }); return; }
+
+  const item = isItem(m.item) ? m.item : null;
+  if (!item) return;
+  let qty = Math.floor(Number(m.qty));
+  if (!Number.isFinite(qty) || qty < 1) qty = 1;
+  qty = Math.min(qty, 999);
+
+  if (m.action === 'deposit') {
+    const moved = invRemove(p.inv, item, qty);
+    if (!moved) return;
+    if (p.equip === item && invCount(p.inv, item) === 0) p.equip = '';
+    invAdd(d.stash, item, moved);
+  } else if (m.action === 'withdraw') {
+    const moved = invRemove(d.stash, item, qty);
+    if (!moved) return;
+    invAdd(p.inv, item, moved);
+  } else return;
+
+  send(p, { t: 'brontoUpd', dino: d.id, inv: d.stash });
+  sendInv(p);
 }
 
 export function dinoCmd(p, m) {
