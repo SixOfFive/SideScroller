@@ -444,7 +444,15 @@ export function drawDino(ctx, x, y, d, br, t) {
     ctx.font = '600 11px sans-serif';
     ctx.textAlign = 'center';
     ctx.fillStyle = '#9be09b';
-    ctx.fillText(`${d.nm || def.name} (${d.o})${d.s === 'stay' ? ' ⏸' : ''}`, cx, y - 8);
+    ctx.fillText(`${d.nm || def.name} (${d.o})${d.s === 'stay' ? ' ⏸' : ''}`, cx, y - 12);
+    // health bar for your tame — always shown so you can watch a guard pet mid-fight
+    if (d.h !== undefined) {
+      const frac = Math.max(0, Math.min(1, d.h / def.hp));
+      ctx.fillStyle = 'rgba(0,0,0,0.55)';
+      ctx.fillRect(cx - 22, y - 7, 44, 4);
+      ctx.fillStyle = frac > 0.5 ? '#7ec96a' : frac > 0.25 ? '#e6c14e' : '#e05a4e';
+      ctx.fillRect(cx - 22, y - 7, 44 * frac, 4);
+    }
   } else if (d.tm > 0) {
     const w = 46;
     ctx.fillStyle = 'rgba(0,0,0,0.55)';
