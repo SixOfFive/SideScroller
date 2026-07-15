@@ -78,7 +78,15 @@ export function spawnDinosInSpan(x0, x1, count) {
     let x = 0, ok = false;
     for (let tries = 0; tries < 8; tries++) {
       x = x0 + 80 + Math.random() * Math.max(1, x1 - x0 - 160);
-      if (!nearStructure(x, 150)) { ok = true; break; } // don't spawn onto a base
+      if (nearStructure(x, 150)) continue; // don't spawn onto a base
+      let clear = true;
+      // ...or onto anyone standing there (night re-rolls skip chunks near
+      // humans, but AI survivors don't hold chunks — don't drop a raptor
+      // on a sleeping bot's head).
+      for (const p of world.players.values()) {
+        if (Math.abs(p.x - x) < PLAYER_CLEARANCE) { clear = false; break; }
+      }
+      if (clear) { ok = true; break; }
     }
     if (!ok) continue;
     const id = newId('d');

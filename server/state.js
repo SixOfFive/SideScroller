@@ -53,13 +53,15 @@ export function syncProfile(p) {
   };
 }
 
-// Keep the profile map bounded: evict the longest-offline profiles.
+// Keep the profile map bounded: evict the longest-offline profiles. Bot
+// profiles are exempt (bounded at 6 names) — evicting one would let a human
+// claim the bot's name, camp, and tames, and lock that bot out forever.
 function evictStaleProfiles() {
   const keys = Object.keys(world.profiles);
   if (keys.length <= MAX_PROFILES) return;
   const online = new Set([...world.players.values()].map((p) => p.key));
   keys
-    .filter((k) => !online.has(k))
+    .filter((k) => !online.has(k) && world.profiles[k].tokenHash !== BOT_TOKEN)
     .sort((a, b) => (world.profiles[a].lastSeen || 0) - (world.profiles[b].lastSeen || 0))
     .slice(0, keys.length - MAX_PROFILES)
     .forEach((k) => delete world.profiles[k]);

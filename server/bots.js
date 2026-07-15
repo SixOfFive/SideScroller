@@ -50,7 +50,9 @@ function spawnBot(idx) {
     x: Number.isFinite(prof?.x) ? prof.x : home,
     y: 0,
     vx: 0, face: 1, anim: 'idle',
-    hp: Number.isFinite(prof?.stats?.hp) ? prof.stats.hp : STATS_MAX,
+    // A profile saved mid-death (hp<=0) must not spawn a corpse: treat it as
+    // a completed death and start fresh.
+    hp: prof?.stats?.hp > 0 ? prof.stats.hp : STATS_MAX,
     hunger: Number.isFinite(prof?.stats?.hunger) ? prof.stats.hunger : STATS_MAX,
     thirst: Number.isFinite(prof?.stats?.thirst) ? prof.stats.thirst : STATS_MAX,
     inv: prof && prof.inv && typeof prof.inv === 'object' ? prof.inv : {},
@@ -142,5 +144,16 @@ export function updateBots(dt) {
 }
 
 export function initBots() {
+  // Reserve the whole roster up front: stamp every unclaimed bot name with a
+  // bot profile so a player can't squat an inactive bot's name (impersonating
+  // it in chat and silently shrinking the spawnable roster). Names a player
+  // already owns are left alone.
+  for (const name of BOT_NAMES) {
+    const key = name.toLowerCase();
+    const prof = world.profiles[key];
+    if (!prof || !prof.tokenHash) {
+      world.profiles[key] = { name, tokenHash: BOT_TOKEN, lastSeen: Date.now() };
+    }
+  }
   syncBotCount();
 }

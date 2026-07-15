@@ -65,15 +65,17 @@ canvas#game { position: fixed; inset: 0; display: block; }
 .recipe .rname { font-weight: 600; }
 
 #buildBar {
-  position: fixed; bottom: 96px; left: 50%; transform: translateX(-50%);
-  display: flex; gap: 6px; z-index: 14;
-  flex-wrap: wrap; justify-content: center; max-width: 94vw;
+  /* Hug the bottom edge and stay slim — the old tall bar sat right on top of
+     the ground around the player, eating the clicks meant for placement. */
+  position: fixed; bottom: 8px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 4px; z-index: 14;
+  flex-wrap: wrap; justify-content: center; max-width: 96vw;
 }
 #buildBar button {
-  padding: 6px 10px; font-size: 12px; cursor: pointer;
+  padding: 3px 7px; font-size: 11px; cursor: pointer;
   background: rgba(16, 21, 32, 0.92); color: #cfe0f5;
   border: 1px solid #33405c; border-radius: 6px;
-  text-align: center; max-width: 150px;
+  text-align: center; max-width: 104px;
 }
 #buildBar button.sel { border-color: #ffd76e; color: #ffd76e; }
 #buildBar button.short .bname { opacity: 0.6; }

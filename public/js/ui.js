@@ -180,6 +180,12 @@ export function closeStorage() {
 
 // --- build bar -------------------------------------------------------------------
 
+// Short material codes for the build bar (full names live in the tooltip).
+const COST_SHORT = {
+  thatch: 'Th', wood: 'Wd', stone: 'St', flint: 'Fl', fiber: 'Fb',
+  metal_ingot: 'Ing', charcoal: 'Ch', gunpowder: 'GP',
+};
+
 function refreshBuildBar() {
   const bar = $('buildBar');
   if (bar.classList.contains('hidden')) return;
@@ -187,9 +193,9 @@ function refreshBuildBar() {
   for (const kind of BUILDABLES) {
     const r = RECIPES[kind];
     const b = el('button', state.build === kind ? 'sel' : '');
-    if (r.desc) b.title = r.desc;
     b.append(el('div', 'bname', r.name));
-    // Visible requirements, red when you're short — no more tooltip guessing.
+    // Visible requirements, red when you're short — compact codes keep the
+    // bar slim so it doesn't blanket the ground you're building on.
     const costEl = el('div', 'bcost');
     let affordable = true;
     Object.entries(r.cost).forEach(([item, qty], i) => {
@@ -197,9 +203,11 @@ function refreshBuildBar() {
       const ok = have >= qty;
       if (!ok) affordable = false;
       costEl.append(el('span', ok ? 'ok' : 'miss',
-        `${i ? ' · ' : ''}${qty} ${itemName(item)}`));
+        `${i ? ' ' : ''}${qty}${COST_SHORT[item] || itemName(item)}`));
     });
     b.append(costEl);
+    b.title = `${r.desc ? r.desc + '\n' : ''}Needs: `
+      + Object.entries(r.cost).map(([it, q]) => `${q} ${itemName(it)}`).join(', ');
     if (!affordable) b.classList.add('short');
     b.onclick = () => {
       state.build = state.build === kind ? null : kind;

@@ -5,11 +5,10 @@ import { world, newId, isBotName } from './state.js';
 import { RECIPES } from '../shared/recipes.js';
 import { STRUCTURES } from '../shared/structures.js';
 import { computePlacement } from '../shared/place.js';
-import { GRID, PLAYER_W, INTERACT_RANGE } from '../shared/const.js';
+import { GRID, PLAYER_W, INTERACT_RANGE, BUILD_REACH } from '../shared/const.js';
 import { toast, sendInv, broadcast } from './net.js';
 import { invAdd, invHas, invPayCost } from './inventory.js';
 
-const BUILD_REACH = 340;
 const colOf = (x) => Math.round(x / GRID);
 
 export function build(p, m) {

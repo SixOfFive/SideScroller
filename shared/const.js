@@ -23,6 +23,7 @@ export const SNAP_HZ = 10;
 
 export const GRID = 96;             // building grid cell (px)
 export const MAX_WALL_STACK = 2;
+export const BUILD_REACH = 340;     // max distance player center -> structure center
 
 export const MAX_PLAYERS = 8;
 export const SPAWN_X = 800;

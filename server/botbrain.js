@@ -8,6 +8,7 @@ import { route } from './handlers.js';
 import { ITEMS, isItem } from '../shared/items.js';
 import { RECIPES } from '../shared/recipes.js';
 import { STRUCTURES } from '../shared/structures.js';
+import { computePlacement, magneticPlacement } from '../shared/place.js';
 import { DINODEFS } from '../shared/dinodefs.js';
 import {
   WORLD_W, PLAYER_W, PLAYER_H, HARVEST_RANGE, INTERACT_RANGE, GRID, STATS_MAX,
@@ -218,7 +219,9 @@ function smeltStep(bot) {
 }
 
 function huntStep(bot) {
-  const prey = findWild(bot, (d) => d.sp === 'dodo', 2600);
+  // Never hunt a dodo someone is mid-taming (tame > 0) — attacking would
+  // reset the progress, possibly the bot's own (or a player's).
+  const prey = findWild(bot, (d) => d.sp === 'dodo' && !(d.tame > 0), 2600);
   if (!prey) { wanderNear(bot, bot.ai.home); return; }
   const px = dinoCx(prey);
   if (goto(bot, px, HARVEST_RANGE - 10)) {
@@ -238,6 +241,14 @@ function craftStep(bot, id) {
 function buildStep(bot, kind, wantX, goalId) {
   const r = RECIPES[kind];
   if (!invHas(bot.inv, r.cost)) { gatherFor(bot, r.cost); return; }
+  // Free-standing pieces slide to the nearest clear spot, same as the player
+  // ghost — otherwise a box aimed at a spot its own hut overlaps would burn
+  // retries and drift the whole camp. Grid pieces keep their raw wantX: their
+  // column comes from colOf(wantX), so re-centering would shift them a column.
+  if (!STRUCTURES[kind].grid) {
+    const probe = magneticPlacement(kind, wantX, world.structures.values());
+    if (probe.ok) wantX = probe.x + STRUCTURES[kind].w / 2;
+  }
   if (!goto(bot, wantX, 120)) return;
   const before = countOwned(bot, kind);
   route(bot, { t: 'build', kind, x: wantX });
@@ -254,11 +265,37 @@ function buildStep(bot, kind, wantX, goalId) {
 // Grid x of the i-th hut column at the bot's camp.
 const hutColX = (bot, i) => (Math.round(bot.ai.home / GRID) + i) * GRID;
 
-// Build a grid piece on the bot's own idx-th foundation (sorted by x).
-function onOwnFoundation(bot, kind, idx, goalId) {
-  const fnds = ownedOfKind(bot, 'foundation').sort((a, b) => a.x - b.x);
-  const f = fnds[Math.min(idx, fnds.length - 1)];
-  if (f) buildStep(bot, kind, f.x, goalId);
+const colOf = (x) => Math.round(x / GRID);
+
+// Count hut pieces of `kinds` standing on the bot's own foundation columns —
+// ANY owner. If a visitor caps the bot's hut with their own roof, the goal is
+// met; insisting on bot-owned pieces would stall the ladder forever.
+function hutPieces(bot, kinds) {
+  const cols = new Set(ownedOfKind(bot, 'foundation').map((f) => colOf(f.x)));
+  let n = 0;
+  for (const s of world.structures.values()) {
+    if (kinds.includes(s.kind) && cols.has(colOf(s.x))) n++;
+  }
+  return n;
+}
+
+// Build a grid piece on whichever of the bot's foundations can actually take
+// it (probed with the real placement rules). Walls/doors prefer emptier
+// columns so the door lands beside the wall, not stacked on it; roofs prefer
+// built-up ones. If no column qualifies, skip this think — the any-owner done
+// checks cover the "someone else finished it" case.
+function onOwnFoundation(bot, kind, goalId) {
+  const all = [...world.structures.values()];
+  const scored = ownedOfKind(bot, 'foundation').map((f) => {
+    let pieces = 0;
+    for (const s of all) {
+      if ((s.kind === 'wall' || s.kind === 'doorframe') && colOf(s.x) === colOf(f.x)) pieces++;
+    }
+    return { f, pieces };
+  }).sort((a, b) => (kind === 'roof' ? b.pieces - a.pieces : a.pieces - b.pieces));
+  for (const { f } of scored) {
+    if (computePlacement(kind, f.x, all).ok) { buildStep(bot, kind, f.x, goalId); return; }
+  }
 }
 
 function cookedMeatStep(bot) {
@@ -301,12 +338,12 @@ const GOALS = [
     step: (b) => buildStep(b, 'foundation', hutColX(b, 0), 'fndA') },
   { id: 'fndB',     recipe: 'foundation', done: (b) => countOwned(b, 'foundation') >= 2,
     step: (b) => buildStep(b, 'foundation', hutColX(b, 1), 'fndB') },
-  { id: 'wall',     recipe: 'wall', done: (b) => countOwned(b, 'wall') >= 1,
-    step: (b) => onOwnFoundation(b, 'wall', 0, 'wall') },
-  { id: 'door',     recipe: 'doorframe', done: (b) => countOwned(b, 'doorframe') >= 1,
-    step: (b) => onOwnFoundation(b, 'doorframe', 1, 'door') },
-  { id: 'roofs',    recipe: 'roof', done: (b) => countOwned(b, 'roof') >= 2,
-    step: (b) => onOwnFoundation(b, 'roof', countOwned(b, 'roof'), 'roofs') },
+  { id: 'wall',     recipe: 'wall', done: (b) => hutPieces(b, ['wall']) >= 1,
+    step: (b) => onOwnFoundation(b, 'wall', 'wall') },
+  { id: 'door',     recipe: 'doorframe', done: (b) => hutPieces(b, ['doorframe']) >= 1,
+    step: (b) => onOwnFoundation(b, 'doorframe', 'door') },
+  { id: 'roofs',    recipe: 'roof', done: (b) => hutPieces(b, ['roof']) >= 2,
+    step: (b) => onOwnFoundation(b, 'roof', 'roofs') },
   { id: 'box',      recipe: 'storage_box', done: (b) => countOwned(b, 'storage_box') >= 1,
     step: (b) => buildStep(b, 'storage_box', b.ai.home + 220, 'box') },
   { id: 'meat',     done: (b) => invCount(b.inv, 'cooked_meat') >= 4,
@@ -439,6 +476,13 @@ function chatTick(bot) {
 // --- the decision pass -------------------------------------------------------------
 
 export function think(bot) {
+  thinkCore(bot);
+  // The border guard runs on EVERY exit path — early returns included. A
+  // thirsty bot's drink trek east must not walk into a leash-camped raptor.
+  leashGuard(bot);
+}
+
+function thinkCore(bot) {
   const ai = bot.ai;
   chatTick(bot);
 
@@ -489,7 +533,6 @@ export function think(bot) {
     else wanderNear(bot, ai.home);
   }
 
-  // 5. after dark, pull it all back to camp; never exit the hub into a camper
+  // 5. after dark, pull it all back to camp
   nightStep(bot);
-  leashGuard(bot);
 }

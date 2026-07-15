@@ -42,8 +42,7 @@ function upsertRemote(w) {
     state.players.set(w.i, p);
   }
   Object.assign(p, w);
-  p.buf.push({ t: performance.now(), x: w.x, y: w.y });
-  if (p.buf.length > 12) p.buf.shift();
+  pushSnap(p.buf, w);
 }
 
 function upsertDino(w) {
@@ -53,8 +52,17 @@ function upsertDino(w) {
     state.dinos.set(w.i, d);
   }
   Object.assign(d, w);
-  d.buf.push({ t: performance.now(), x: w.x, y: w.y });
-  if (d.buf.length > 12) d.buf.shift();
+  pushSnap(d.buf, w);
+}
+
+// Buffer a snapshot sample. A big jump means a teleport (respawn, portal) —
+// drop the old samples so the entity snaps there instead of gliding across
+// half the map for a second.
+function pushSnap(buf, w) {
+  const last = buf[buf.length - 1];
+  if (last && Math.abs(w.x - last.x) > 400) buf.length = 0;
+  buf.push({ t: performance.now(), x: w.x, y: w.y });
+  if (buf.length > 12) buf.shift();
 }
 
 // Interpolated draw position for anything with a .buf of snapshots.

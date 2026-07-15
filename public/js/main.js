@@ -14,8 +14,9 @@ import {
 } from './ui.js';
 import { initChat, focusChat } from './chat.js';
 import { initSound, toggleMute, sfx } from './sound.js';
-import { HARVEST_RANGE, INTERACT_RANGE, PLAYER_W, PLAYER_H } from '/shared/const.js';
+import { HARVEST_RANGE, INTERACT_RANGE, PLAYER_W, PLAYER_H, BUILD_REACH } from '/shared/const.js';
 import { STRUCTURES } from '/shared/structures.js';
+import { magneticPlacement } from '/shared/place.js';
 import { DINODEFS } from '/shared/dinodefs.js';
 import { ITEMS } from '/shared/items.js';
 import { interp } from './state.js';
@@ -133,8 +134,17 @@ function processActions() {
   for (const a of popActions()) {
     switch (a.type) {
       case 'click':
-        if (state.build) sendMsg({ t: 'build', kind: state.build, x: screenToWorldX(mouse.x) });
-        else doSwing();
+        if (state.build) {
+          // Mirror the server's checks locally: magnet to a clear spot, refuse
+          // out-of-reach placements with the same message the ghost shows.
+          const res = magneticPlacement(state.build, screenToWorldX(mouse.x), state.structures.values());
+          const def = STRUCTURES[state.build];
+          if (!res.ok) { toast(res.reason || 'Blocked'); break; }
+          if (Math.abs(res.x + def.w / 2 - meCenter()) > BUILD_REACH) { toast('Too far — walk closer'); break; }
+          // Grid pieces: send res.x raw (colOf(x) picks the column — a center
+          // offset would shift it a column). Free pieces: send the center.
+          sendMsg({ t: 'build', kind: state.build, x: def.grid ? res.x : res.x + def.w / 2 });
+        } else doSwing();
         break;
       case 'swing': doSwing(); break;
       case 'interact': doInteract(); break;

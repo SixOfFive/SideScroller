@@ -3,7 +3,8 @@
 // terrain y from the server.
 
 import { STRUCTURES } from '/shared/structures.js';
-import { computePlacement } from '/shared/place.js';
+import { magneticPlacement } from '/shared/place.js';
+import { BUILD_REACH, PLAYER_W } from '/shared/const.js';
 import { groundAt, grassAt, streamsIn, STREAM_HALF } from '/shared/terrain.js';
 import { state } from './state.js';
 import { hash01, shade } from './r_bg.js';
@@ -388,18 +389,38 @@ export function drawStructures(ctx, camX, viewW, br, t) {
 
 export function drawBuildGhost(ctx, wantX, br, t) {
   if (!state.build) return null;
-  const res = computePlacement(state.build, wantX, state.structures.values());
   const def = STRUCTURES[state.build];
+  const meC = state.me.x + PLAYER_W / 2;
+
+  // Dotted baseline along the stretch of ground within building reach, so the
+  // limit is visible before a click gets refused.
+  ctx.save();
+  ctx.strokeStyle = 'rgba(140, 220, 160, 0.4)';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([6, 8]);
+  ctx.beginPath();
+  ctx.moveTo(meC - BUILD_REACH, groundAt(meC - BUILD_REACH) - 5);
+  for (let x = meC - BUILD_REACH + 24; x <= meC + BUILD_REACH; x += 24) {
+    ctx.lineTo(x, groundAt(x) - 5);
+  }
+  ctx.stroke();
+  ctx.restore();
+
+  // Magnetic: blocked free-standing spots slide to the nearest clear gap.
+  const res = magneticPlacement(state.build, wantX, state.structures.values());
   if (res.x === undefined) return res;
   const gy = res.y || groundAt(res.x + def.w / 2) - def.h;
+  const tooFar = Math.abs(res.x + def.w / 2 - meC) > BUILD_REACH;
+  const ok = res.ok && !tooFar;
   drawStructure(ctx, { kind: state.build, x: res.x, y: gy, lit: false }, br, t, 0.55);
-  ctx.fillStyle = res.ok ? 'rgba(90,220,120,0.25)' : 'rgba(230,70,70,0.3)';
+  ctx.fillStyle = ok ? 'rgba(90,220,120,0.25)' : 'rgba(230,70,70,0.3)';
   ctx.fillRect(res.x, gy, def.w, def.h);
-  if (!res.ok && res.reason) {
+  const msg = !res.ok ? res.reason : tooFar ? 'Too far — walk closer' : null;
+  if (msg) {
     ctx.font = 'bold 13px sans-serif';
     ctx.textAlign = 'center';
     ctx.fillStyle = '#ff9d9d';
-    ctx.fillText(res.reason, res.x + def.w / 2, gy - 8);
+    ctx.fillText(msg, res.x + def.w / 2, gy - 8);
   }
   return res;
 }

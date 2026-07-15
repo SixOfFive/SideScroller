@@ -90,3 +90,20 @@ export function computePlacement(kind, wantX, structures) {
   if (hit) return { ok: false, x, y, reason: 'Blocked by ' + STRUCTURES[hit.kind].name };
   return { ok: true, x, y };
 }
+
+// Forgiving placement for free-standing pieces: if the exact spot is blocked,
+// slide to the nearest clear spot within `radius` px so players don't have to
+// pixel-hunt gaps between structures. Grid pieces keep their strict snap.
+export function magneticPlacement(kind, wantX, structures, radius = 130) {
+  const arr = Array.isArray(structures) ? structures : [...structures];
+  const res = computePlacement(kind, wantX, arr);
+  const def = STRUCTURES[kind];
+  if (res.ok || !def || def.grid) return res;
+  for (let d = 16; d <= radius; d += 16) {
+    for (const s of [1, -1]) {
+      const r2 = computePlacement(kind, wantX + d * s, arr);
+      if (r2.ok) return r2;
+    }
+  }
+  return res;
+}
