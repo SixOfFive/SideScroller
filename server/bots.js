@@ -12,6 +12,7 @@ import { world, newId, syncProfile, BOT_TOKEN } from './state.js';
 import { broadcast, wirePlayer } from './net.js';
 import { think, THINK_S } from './botbrain.js';
 import { WORLD_W, PLAYER_W, PLAYER_H, STATS_MAX, MOVE_SPEED } from '../shared/const.js';
+import { clampStrait } from '../shared/regions.js';
 import { groundTop, streamsIn, STREAM_HALF } from '../shared/terrain.js';
 
 export const MAX_BOTS = 4;
@@ -130,6 +131,7 @@ function stepBot(p, dt) {
   }
   if (ai.swingT > 0) p.anim = 'swing';
   p.x = Math.min(Math.max(p.x, 20), WORLD_W - PLAYER_W - 20);
+  p.x = clampStrait(p.x, PLAYER_W); // bots stay on the mainland side too
   p.y = groundTop(p.x, PLAYER_W) - PLAYER_H;
 }
 

@@ -5,6 +5,7 @@
 import {
   GRAVITY, MOVE_SPEED, JUMP_VEL, PLAYER_W, PLAYER_H,
 } from '/shared/const.js';
+import { clampStrait } from '/shared/regions.js';
 import { STRUCTURES } from '/shared/structures.js';
 import { groundTop, inWater } from '/shared/terrain.js';
 import { state } from './state.js';
@@ -48,7 +49,7 @@ export function stepLocal(me, dt, held) {
     if (me.vx > 0 && me.x + PLAYER_W <= r.x && nx + PLAYER_W > r.x) { nx = r.x - PLAYER_W; me.vx = 0; }
     if (me.vx < 0 && me.x >= r.x + r.w && nx < r.x + r.w) { nx = r.x + r.w; me.vx = 0; }
   }
-  me.x = Math.min(Math.max(nx, 0), state.worldW - PLAYER_W);
+  me.x = clampStrait(Math.min(Math.max(nx, 0), state.worldW - PLAYER_W), PLAYER_W);
 
   // Vertical: land on ground or one-way platform tops when falling.
   let ny = me.y + me.vy * dt;

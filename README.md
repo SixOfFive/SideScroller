@@ -48,16 +48,29 @@ Close the window or press Ctrl+C to stop it.
 - Keys 1–4 are a hotbar: pin any tool to any key from the inventory (Tab);
   unpinned slots automatically use the best tool you own (metal over stone,
   rifle over sword over spear).
-- The island is five regions of rising danger: the safe Spawn Meadow hub,
-  Whispering Forest, Rocky Highlands, Deep Wilds, and the Scorched Badlands.
-  Portals at the hub jump you to each region's entrance; return portals bring
-  you home — so one central base, exploring outward.
+- The mainland is a danger gradient you can walk end to end: the safe Spawn
+  Meadow hub, Whispering Forest, Rocky Highlands, Deep Wilds, and the Scorched
+  Badlands. Past it lies the **Sunder Strait** — an impassable channel — and
+  beyond that the **outer isles**: the Verdant Canopy jungle, the Frozen Reach
+  glacier, the Fetid Mire swamp, and the volcanic Emberpeak, each with its own
+  resource mix and dinos. You reach the isles *only* by portal — they are not
+  just "further along" the scroll.
+- Hub portals come in two flavours: **frontier** portals that skip you deeper
+  along the mainland (Highlands / Wilds / Badlands), and **isle** portals that
+  cross the strait to each outer biome. Every destination has a return portal
+  home — so one central base, expeditions outward.
 - Terrain rolls: hills to jump up, valleys, and streams to drink from (watch
   the thirst bar; berries help too).
 - Dinos: dodos and parasaurs are tameable with berries (parasaurs are
-  rideable — press R). Compys and dilos are small but aggressive; raptors will
-  shred anyone not in a full metal armor set; the T-Rex is best avoided until
-  you've built a rifle.
+  rideable — press R). Compys, dilos and pack-hunting troodons are small but
+  aggressive; raptors, carnos, sabertooths and swamp sarcos will shred anyone
+  not in a full metal armor set; the T-Rex is best avoided until you've built a
+  rifle. Trikes leave you alone until you hit them — then they charge.
+- **Carnivore training:** you can't berry-tame a meat-eater — you have to
+  *subdue* it. Wear it down with melee until it drops (it's knocked out, not
+  killed — melee won't finish a tameable), then feed it raw meat before it comes
+  to. A tamed carnivore is a devastating bodyguard. (Trikes knock out too, then
+  tame on berries.)
 - **Tames guard you**: a following pet intercepts any hostile that closes in —
   war dodos peck compys to death, a parasaur's tail can fight off a lone
   raptor — and you loot whatever your bodyguard kills. Hostiles fight back
@@ -87,5 +100,8 @@ Close the window or press Ctrl+C to stop it.
       portals + region hub, night re-randomization, metal tier + rifle,
       thirst, ESC options, procedural sound
 - [x] AI survivors: computer players that progress through the same tech tree
-- [ ] Later: saddles + more mounts, ranged dinos, boss arenas, map gating tiers,
-      bots using portals / rifles / armor
+- [x] World expansion: outer isles across the Sunder Strait (jungle/glacier/
+      swamp/volcano), portal-only crossings + frontier portals, new dino roster
+      (carno/sabertooth/trike/sarco/troodon), carnivore subdue-taming, pet guards
+- [ ] Later: saddles + more mounts, ranged dinos, boss arenas, deeper isle-only
+      resources (crystal/oil), bots using portals / rifles / armor

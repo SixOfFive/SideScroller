@@ -69,7 +69,8 @@ function evictStaleProfiles() {
 
 // Bump when world geometry changes shape (e.g. the terrain overhaul):
 // old saves are discarded and the world regenerates.
-export const SAVE_VERSION = 2;
+// v3: world widened to 10 bands (mainland + strait + outer isles).
+export const SAVE_VERSION = 3;
 
 export function saveWorld() {
   for (const p of world.players.values()) syncProfile(p);

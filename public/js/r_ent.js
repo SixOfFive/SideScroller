@@ -155,6 +155,15 @@ const LOOK = {
   parasaur: { hue: 150, sat: 34, jaw: 0.5, crest: 1.6, frill: 0, tail: 1.25, arm: 0.4, teeth: 0 },
   raptor:   { hue: 184, sat: 40, jaw: 0.95, crest: 0, frill: 0, tail: 1.2, arm: 0.7, teeth: 1, claw: 1 },
   rex:      { hue: 20,  sat: 42, jaw: 1.5, crest: 0, frill: 0, tail: 1.0, arm: 0.25, teeth: 1 },
+  carno:    { hue: 10,  sat: 46, jaw: 1.2, crest: 0, frill: 0, tail: 1.05, arm: 0.2, teeth: 1, claw: 1 },
+  troodon:  { hue: 128, sat: 46, jaw: 0.8, crest: 0, frill: 0, tail: 1.28, arm: 0.6, teeth: 1, claw: 1 },
+};
+
+// Per-species quadruped params (trike/sarco/sabertooth): body color + head kit.
+const QLOOK = {
+  trike:      { hue: 110, sat: 28, tail: 0.7, neck: 0.5, head: 0.95, snout: 0.5, frill: 1, horns: 1, fang: 0, low: 0 },
+  sarco:      { hue: 74,  sat: 26, tail: 1.35, neck: 0.7, head: 1.05, snout: 1.5, frill: 0, horns: 0, fang: 1, low: 1 },
+  sabertooth: { hue: 30,  sat: 42, tail: 0.7, neck: 0.5, head: 0.92, snout: 0.7, frill: 0, horns: 0, fang: 2, low: 0.4 },
 };
 
 // A generic theropod filling the [0,-H]x[±W/2] box, facing +x, feet at y=0.
@@ -275,6 +284,113 @@ function drawTheropod(ctx, d, def, look, h, br, t) {
   ctx.beginPath(); ctx.arc(headX + W * 0.02, headY - H * 0.02, Math.max(2, H * 0.03), 0, 7); ctx.fill();
 }
 
+function drawLeg(ctx, x, hipY, phase) {
+  ctx.beginPath();
+  ctx.moveTo(x, hipY);
+  ctx.lineTo(x + phase * 10, -2);
+  ctx.stroke();
+}
+
+// A generic four-legged beast filling [0,-H]x[±W/2], facing +x, feet at y=0.
+// Head kit (frill/horns/snout/fangs) is driven by the QLOOK entry.
+function drawQuadruped(ctx, d, def, look, h, br, t) {
+  const W = def.w, H = def.h;
+  const indiv = (hash01(h) - 0.5) * 8;
+  const L = (l) => Math.max(0, Math.min(100, l * (0.42 + br * 0.58)));
+  const body = `hsl(${look.hue + indiv}, ${look.sat}%, ${L(40)}%)`;
+  const dark = `hsl(${look.hue + indiv}, ${look.sat}%, ${L(29)}%)`;
+  const belly = `hsl(${look.hue + indiv}, ${look.sat - 6}%, ${L(54)}%)`;
+  const moving = d.s === 'walk' || d.s === 'flee' || d.s === 'follow' || d.s === 'chase' || d.s === 'ridden';
+  const spd = d.s === 'flee' || d.s === 'chase' ? 0.03 : 0.016;
+  const gait = moving ? Math.sin(t * spd + h) : 0;
+  const backY = -H * (look.low ? 0.50 : 0.62);
+  const hipY = -H * 0.30;
+
+  // tail
+  ctx.fillStyle = dark;
+  ctx.beginPath();
+  ctx.moveTo(-W * 0.18, backY + H * 0.16);
+  ctx.quadraticCurveTo(-W * 0.55 * look.tail, hipY - H * 0.02, -W * 0.66 * look.tail, hipY + H * 0.10);
+  ctx.quadraticCurveTo(-W * 0.40, hipY + H * 0.18, -W * 0.12, hipY + H * 0.04);
+  ctx.closePath(); ctx.fill();
+
+  // far legs
+  ctx.strokeStyle = dark; ctx.lineWidth = Math.max(4, H * 0.10); ctx.lineCap = 'round';
+  drawLeg(ctx, -W * 0.12, hipY, -gait);
+  drawLeg(ctx, W * 0.20, hipY, gait);
+
+  // body + belly
+  ctx.fillStyle = body;
+  ctx.beginPath();
+  ctx.ellipse(0, (backY + hipY) / 2, W * 0.40, (hipY - backY) / 2 + H * 0.04, 0, 0, 7);
+  ctx.fill();
+  ctx.fillStyle = belly;
+  ctx.beginPath();
+  ctx.ellipse(0, hipY + H * 0.02, W * 0.32, H * 0.10, 0, 0, 7);
+  ctx.fill();
+
+  // near legs (animated opposite)
+  ctx.strokeStyle = body; ctx.lineWidth = Math.max(4, H * 0.11);
+  drawLeg(ctx, -W * 0.06, hipY, gait);
+  drawLeg(ctx, W * 0.26, hipY, -gait);
+
+  // neck + head
+  const headX = W * 0.42, headY = backY - H * 0.06 - look.neck * H * 0.16;
+  ctx.strokeStyle = body; ctx.lineWidth = H * 0.20;
+  ctx.beginPath();
+  ctx.moveTo(W * 0.24, backY + H * 0.04);
+  ctx.quadraticCurveTo(W * 0.36, backY - H * 0.02, headX, headY);
+  ctx.stroke();
+
+  // frill (trike) behind the head
+  if (look.frill) {
+    ctx.fillStyle = `hsl(${look.hue + indiv}, ${look.sat + 10}%, ${L(46)}%)`;
+    ctx.beginPath();
+    ctx.ellipse(headX - W * 0.06, headY, W * 0.12, H * 0.28, 0, 0, 7);
+    ctx.fill();
+    ctx.strokeStyle = dark; ctx.lineWidth = 2; ctx.stroke();
+  }
+  // head
+  ctx.fillStyle = body;
+  ctx.beginPath();
+  ctx.ellipse(headX, headY, W * 0.12 * look.head, H * 0.13 * look.head, 0.1, 0, 7);
+  ctx.fill();
+
+  // snout / jaws
+  const sn = W * 0.14 * look.snout;
+  ctx.fillStyle = body;
+  ctx.beginPath();
+  ctx.moveTo(headX + W * 0.05, headY - H * 0.05);
+  ctx.lineTo(headX + W * 0.05 + sn, headY - H * 0.02);
+  ctx.lineTo(headX + W * 0.05 + sn, headY + H * 0.05);
+  ctx.lineTo(headX + W * 0.05, headY + H * 0.06);
+  ctx.closePath(); ctx.fill();
+  if (look.fang >= 2) { // sabertooth fang
+    ctx.fillStyle = '#f2eede';
+    const fx = headX + W * 0.05 + sn * 0.5;
+    ctx.beginPath();
+    ctx.moveTo(fx, headY + H * 0.05); ctx.lineTo(fx + 2, headY + H * 0.05);
+    ctx.lineTo(fx + 1, headY + H * 0.20); ctx.closePath(); ctx.fill();
+  } else if (look.fang) { // croc tooth row
+    ctx.fillStyle = '#f2eede';
+    for (let i = 0; i < 3; i++) {
+      const tx = headX + W * 0.06 + (sn * (i + 0.5)) / 3;
+      ctx.beginPath();
+      ctx.moveTo(tx, headY + H * 0.045); ctx.lineTo(tx + 1.5, headY + H * 0.045);
+      ctx.lineTo(tx + 0.75, headY + H * 0.10); ctx.closePath(); ctx.fill();
+    }
+  }
+  // horns (trike)
+  if (look.horns) {
+    ctx.strokeStyle = '#e9e4d0'; ctx.lineWidth = Math.max(2.5, H * 0.045); ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(headX + W * 0.13, headY - H * 0.05); ctx.lineTo(headX + W * 0.26, headY - H * 0.22); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(headX + W * 0.15, headY + H * 0.03); ctx.lineTo(headX + W * 0.24, headY - H * 0.03); ctx.stroke();
+  }
+  // eye
+  ctx.fillStyle = d.o ? '#1b1b1b' : (def.behavior === 'aggressive' ? '#e33' : '#1b1b1b');
+  ctx.beginPath(); ctx.arc(headX + W * 0.02, headY - H * 0.02, Math.max(2, H * 0.032), 0, 7); ctx.fill();
+}
+
 // Dodo keeps its round-bird look; everything else is a theropod.
 function drawDodo(ctx, d, def, h, br, t) {
   const hue = 25 + hash01(h) * 30;
@@ -317,7 +433,9 @@ export function drawDino(ctx, x, y, d, br, t) {
   ctx.save();
   ctx.translate(cx, base);
   ctx.scale(d.f < 0 ? -1 : 1, 1);
+  if (d.kd) ctx.globalAlpha = 0.7; // knocked out: washed out
   if (d.sp === 'dodo' || !d.sp) drawDodo(ctx, d, def, h, br, t);
+  else if (def.shape === 'quadruped') drawQuadruped(ctx, d, def, QLOOK[d.sp] || QLOOK.sarco, h, br, t);
   else drawTheropod(ctx, d, def, LOOK[d.sp] || LOOK.compy, h, br, t);
   ctx.restore();
 
@@ -339,21 +457,32 @@ export function drawDino(ctx, x, y, d, br, t) {
     ctx.fillText('taming…', cx, y - 17);
   }
   if (!d.o) {
-    // threat-colored name for wild dinos so a rex reads differently than a compy
-    const THREAT = ['#a7d8a0', '#e6d27a', '#e8a24e', '#e8663e', '#ff3b3b'];
-    if ((def.threat || 0) >= 1) {
-      ctx.font = `${def.threat >= 3 ? '700' : '600'} 11px sans-serif`;
+    if (d.kd) {
+      // knocked out and ready to train: tell the player what to feed it
+      const food = def.tame && def.tame.food === 'berry' ? 'berries' : 'meat';
+      ctx.font = '700 11px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillStyle = 'rgba(0,0,0,0.5)';
-      ctx.fillText(def.name, cx + 1, y - 7);
-      ctx.fillStyle = THREAT[def.threat] || '#fff';
-      ctx.fillText(def.threat >= 4 ? `⚠ ${def.name} ⚠` : def.name, cx, y - 8);
-    }
-    if (d.h !== undefined && d.h < def.hp) {
       ctx.fillStyle = 'rgba(0,0,0,0.55)';
-      ctx.fillRect(cx - 22, y - 4, 44, 4);
-      ctx.fillStyle = '#e05a4e';
-      ctx.fillRect(cx - 22, y - 4, 44 * (d.h / def.hp), 4);
+      ctx.fillText(`${def.name} KO — feed ${food}`, cx + 1, y - 7);
+      ctx.fillStyle = '#ffe08a';
+      ctx.fillText(`${def.name} KO — feed ${food}`, cx, y - 8);
+    } else {
+      // threat-colored name for wild dinos so a rex reads differently than a compy
+      const THREAT = ['#a7d8a0', '#e6d27a', '#e8a24e', '#e8663e', '#ff3b3b', '#ff3b3b'];
+      if ((def.threat || 0) >= 1) {
+        ctx.font = `${def.threat >= 3 ? '700' : '600'} 11px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.fillText(def.name, cx + 1, y - 7);
+        ctx.fillStyle = THREAT[def.threat] || '#fff';
+        ctx.fillText(def.threat >= 4 ? `⚠ ${def.name} ⚠` : def.name, cx, y - 8);
+      }
+      if (d.h !== undefined && d.h < def.hp) {
+        ctx.fillStyle = 'rgba(0,0,0,0.55)';
+        ctx.fillRect(cx - 22, y - 4, 44, 4);
+        ctx.fillStyle = '#e05a4e';
+        ctx.fillRect(cx - 22, y - 4, 44 * (d.h / def.hp), 4);
+      }
     }
   }
 }

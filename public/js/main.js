@@ -100,8 +100,13 @@ function doInteract() {
   if (state.me.inWater) { sendMsg({ t: 'drink' }); return; }
 
   const s = findNearestStructure(INTERACT_RANGE + 30, ['storage_box', 'campfire', 'forge']);
-  // Only tameable dinos claim E — otherwise a nearby raptor would block your box.
-  const d = findNearestDino(INTERACT_RANGE + 30, (dd) => !dd.o && DINODEFS[dd.sp] && DINODEFS[dd.sp].tame);
+  // Only tameable dinos claim E — and a subdue-tame carnivore only once it's
+  // knocked out, so a rampaging raptor never blocks your box.
+  const d = findNearestDino(INTERACT_RANGE + 30, (dd) => {
+    const def = DINODEFS[dd.sp];
+    if (dd.o || !def || !def.tame) return false;
+    return def.tame.method === 'subdue' ? !!dd.kd : true;
+  });
   const sD = s ? Math.abs(s.x + STRUCTURES[s.kind].w / 2 - cx) : Infinity;
   const dD = d ? Math.abs(d.x - cx) : Infinity;
   if (d && dD < sD) { sendMsg({ t: 'feed', dino: d.i }); return; }

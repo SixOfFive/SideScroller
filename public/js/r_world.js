@@ -5,6 +5,7 @@
 import { STRUCTURES } from '/shared/structures.js';
 import { magneticPlacement } from '/shared/place.js';
 import { BUILD_REACH, PLAYER_W } from '/shared/const.js';
+import { STRAIT_X0, STRAIT_X1 } from '/shared/regions.js';
 import { groundAt, grassAt, streamsIn, STREAM_HALF } from '/shared/terrain.js';
 import { state } from './state.js';
 import { hash01, shade } from './r_bg.js';
@@ -98,6 +99,54 @@ export function drawGround(ctx, camX, viewW, br, t) {
       ctx.fillStyle = h < 0.43 ? shade(230, 180, 70, br) : shade(220, 120, 150, br);
       ctx.beginPath(); ctx.arc(wx, gy - 16, 4, 0, 7); ctx.fill();
     }
+  }
+
+  drawStrait(ctx, camX, viewW, br, t);
+}
+
+// The impassable Sunder Strait: deep sea filling the barrier band, with a
+// warning sign on each shore. Players are clamped out of it (physics.js); the
+// sea sells why. Only drawn when the barrier band is on-screen.
+function drawStrait(ctx, camX, viewW, br, t) {
+  const l = Math.max(STRAIT_X0, camX - 40);
+  const r = Math.min(STRAIT_X1, camX + viewW + 40);
+  if (l < r) {
+    const SEA_Y = 452;
+    const grd = ctx.createLinearGradient(0, SEA_Y, 0, VIEW_H);
+    grd.addColorStop(0, `rgba(${40 + br * 20},${100 + br * 30},${150 + br * 40},0.94)`);
+    grd.addColorStop(1, 'rgba(12,36,70,0.99)');
+    ctx.fillStyle = grd;
+    ctx.fillRect(l, SEA_Y, r - l, VIEW_H - SEA_Y);
+    // wavy surface line
+    ctx.strokeStyle = `rgba(200,230,255,${0.4 + br * 0.2})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let x = l; x <= r; x += 10) {
+      const yy = SEA_Y + Math.sin(t * 0.003 + x * 0.03) * 4;
+      if (x === l) ctx.moveTo(x, yy); else ctx.lineTo(x, yy);
+    }
+    ctx.stroke();
+    // drifting glints
+    ctx.strokeStyle = `rgba(220,240,255,${0.18 + 0.1 * Math.sin(t * 0.004)})`;
+    const span = Math.max(1, r - l);
+    for (let i = 0; i < 8; i++) {
+      const gx = l + ((i * 137.5 + t * 0.02) % span);
+      const gy = SEA_Y + 20 + i * 7;
+      ctx.beginPath(); ctx.moveTo(gx - 8, gy); ctx.lineTo(gx + 8, gy); ctx.stroke();
+    }
+  }
+  // shore signs sit just outside each shore (on solid ground)
+  for (const px of [STRAIT_X0 - 70, STRAIT_X1 + 70]) {
+    if (px < camX - 30 || px > camX + viewW + 30) continue;
+    const gy = groundAt(px);
+    ctx.fillStyle = shade(96, 70, 45, br);
+    ctx.fillRect(px - 3, gy - 58, 6, 58);
+    ctx.fillStyle = shade(150, 60, 52, br);
+    ctx.fillRect(px - 24, gy - 66, 48, 22);
+    ctx.fillStyle = '#ffe08a';
+    ctx.font = 'bold 15px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('⚠ portal', px, gy - 51);
   }
 }
 

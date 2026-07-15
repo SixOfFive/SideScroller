@@ -3,7 +3,12 @@
 //
 // behavior: 'passive'  wanders, flees when hit, can be tamed
 //           'aggressive' wanders, chases + bites players inside aggro range
-// tame:     present if the species can be passively tamed (fed `food`)
+// defensive: a passive that turns and fights (not flees) when struck
+// shape:    client silhouette — 'dodo' | 'quadruped' | undefined (theropod)
+// tame:     present if the species can be tamed. method 'feed' (default) is
+//           passive taming (feed `food` at range). method 'subdue' is carnivore
+//           training: knock its hp below `subdueFrac` of max, then feed `food`
+//           while it's down.
 // rideable: tamed mounts you can ride (press R)
 // threat:   0 harmless .. 4 lethal — drives the HUD danger read
 
@@ -54,6 +59,49 @@ export const DINODEFS = {
     hp: 440, speed: 92, fleeSpeed: 92,
     behavior: 'aggressive', dmg: 58, aggro: 600, attackRange: 100, attackCd: 1.5,
     drops: { raw_meat: [8, 12], hide: [6, 10] },
+  },
+
+  // --- carnivores you TRAIN by subduing (knock down, then feed meat) --------
+  troodon: {
+    name: 'Troodon', w: 46, h: 40, threat: 2,
+    hp: 46, speed: 172, fleeSpeed: 180,
+    behavior: 'aggressive', dmg: 12, aggro: 440, attackRange: 46, attackCd: 0.9,
+    packMin: 2, timid: true,            // a pack hunter — bold in numbers, skittish alone
+    drops: { raw_meat: [1, 2], hide: [1, 1] },
+    tame: { method: 'subdue', food: 'raw_meat', feeds: 4, cooldownS: 4, subdueFrac: 0.32 },
+  },
+  sarco: {
+    name: 'Sarco', w: 96, h: 52, threat: 3, shape: 'quadruped',
+    hp: 200, speed: 118, fleeSpeed: 132,
+    behavior: 'aggressive', dmg: 22, aggro: 460, attackRange: 62, attackCd: 1.1,
+    drops: { raw_meat: [3, 5], hide: [3, 5] },
+    tame: { method: 'subdue', food: 'raw_meat', feeds: 6, cooldownS: 5, subdueFrac: 0.3 },
+  },
+  sabertooth: {
+    name: 'Sabertooth', w: 84, h: 58, threat: 3, shape: 'quadruped',
+    hp: 155, speed: 206, fleeSpeed: 206,
+    behavior: 'aggressive', dmg: 24, aggro: 520, attackRange: 54, attackCd: 0.8,
+    drops: { raw_meat: [2, 3], hide: [2, 4] },
+    tame: { method: 'subdue', food: 'raw_meat', feeds: 5, cooldownS: 5, subdueFrac: 0.3 },
+  },
+  carno: {
+    name: 'Carno', w: 128, h: 96, threat: 3,
+    hp: 260, speed: 150, fleeSpeed: 150,
+    behavior: 'aggressive', dmg: 30, aggro: 560, attackRange: 80, attackCd: 1.1,
+    drops: { raw_meat: [4, 6], hide: [3, 5] },
+    tame: { method: 'subdue', food: 'raw_meat', feeds: 6, cooldownS: 5, subdueFrac: 0.28 },
+  },
+
+  // --- a defensive herbivore: leaves you alone until struck, then charges;
+  //     knock it down and it tames on berries ---------------------------------
+  trike: {
+    name: 'Trike', w: 120, h: 84, threat: 2, shape: 'quadruped',
+    hp: 320, speed: 92, fleeSpeed: 120,
+    behavior: 'passive', defensive: true,
+    dmg: 26, attackRange: 72, attackCd: 1.4, aggro: 470,
+    drops: { raw_meat: [3, 5], hide: [4, 6] },
+    tame: { method: 'subdue', food: 'berry', feeds: 10, cooldownS: 6, subdueFrac: 0.35 },
+    egg: [300, 420],
   },
 };
 

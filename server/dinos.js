@@ -5,7 +5,7 @@
 import { world, newId } from './state.js';
 import { DINODEFS, WEAPON_DMG } from '../shared/dinodefs.js';
 import { ITEMS } from '../shared/items.js';
-import { REGIONS, REGION_W } from '../shared/regions.js';
+import { REGIONS, REGION_W, clampStrait } from '../shared/regions.js';
 import { WORLD_W, HARVEST_RANGE, INTERACT_RANGE, PLAYER_W, PLAYER_H, GRAVITY } from '../shared/const.js';
 import { groundAt } from '../shared/terrain.js';
 import { send, toast, sendInv, sendStats, broadcast } from './net.js';
@@ -152,15 +152,51 @@ function packCount(d) {
   return n;
 }
 
-// How a hurt wild dino reacts: passives flee; timid packs flee when
-// outnumbered; everything else turns and hunts the attacker.
+// How a hurt wild dino reacts: defensive herbivores (trike) turn and charge;
+// passives flee; timid packs flee when outnumbered; everything else turns and
+// hunts the attacker.
 function reactToAttack(d, def, p) {
+  if (def.defensive) {
+    d.provokedT = 8; // charge the attacker instead of fleeing
+    d.lastBite = Math.max(d.lastBite || 0, Date.now() - def.attackCd * 1000 + 250);
+    return;
+  }
   if (def.behavior === 'passive' || (def.timid && packCount(d) < (def.packMin || 2))) {
     d.state = 'flee'; d.fleeFrom = playerCenter(p); d.stateT = 4;
     return;
   }
   d.provokedT = 8;
   d.lastBite = Math.max(d.lastBite || 0, Date.now() - def.attackCd * 1000 + 250);
+}
+
+// --- carnivore training (subdue, then feed) ---------------------------------
+const SUBDUE_WINDOW_MS = 22000; // knocked-out time; every feed refreshes it
+
+// Knock a subdue-tameable dino out: it stops fighting and can be fed while down.
+function subdue(d, def, byPlayer) {
+  d.subdued = true;
+  d.subduedUntil = Date.now() + SUBDUE_WINDOW_MS;
+  d.state = 'idle';
+  d.provokedT = 0;
+  d.dinoFoe = null;
+  broadcast({ t: 'fx', kind: 'star', x: dinoCenter(d), y: d.y - 8 });
+  if (byPlayer) {
+    const f = def.tame.food === 'berry' ? 'berries' : 'raw meat';
+    toast(byPlayer, `${def.name} is down! Feed it ${f} (E) before it comes to.`);
+  }
+}
+
+// A knocked-out dino just lies there until fed or it wakes and turns hostile.
+function stepSubdued(d, def, dt, now) {
+  d.state = 'idle';
+  if (now >= (d.subduedUntil || 0)) {
+    d.subdued = false;
+    d.tame = Math.max(0, d.tame - 0.5); // lost most of the progress
+    d.hp = Math.min(def.hp, d.hp + def.hp * 0.25);
+    if (def.behavior === 'aggressive' || def.defensive) d.provokedT = 6;
+    broadcast({ t: 'fx', kind: 'poof', x: dinoCenter(d), y: d.y + 12 });
+  }
+  walkOnGround(d, def);
 }
 
 function bite(d, p, def, now) {
@@ -187,6 +223,7 @@ function bite(d, p, def, now) {
 
 function walkOnGround(d, def) {
   d.x = Math.min(Math.max(d.x, 40), WORLD_W - 40 - def.w);
+  d.x = clampStrait(d.x, def.w); // can't wade the impassable strait
   d.y = groundAt(d.x + def.w / 2) - def.h;
   d.vy = 0;
 }
@@ -373,6 +410,7 @@ function stepRidden(d, def, dt) {
   if (dir) d.face = dir;
   d.x += dir * (def.rideSpeed || def.speed) * dt;
   d.x = Math.min(Math.max(d.x, 40), WORLD_W - 40 - def.w);
+  d.x = clampStrait(d.x, def.w); // mounts can't cross the strait either
 
   const groundY = groundAt(d.x + def.w / 2) - def.h;
   // Snap-down so a mount stays grounded walking downhill and can still jump.
@@ -396,8 +434,12 @@ function stepDino(d, dt, now) {
   const def = DINODEFS[d.sp];
   if (d.rider) { stepRidden(d, def, dt); return; }
   if (d.owner) { stepTamed(d, def, dt, now); return; }
+  if (d.subdued) { stepSubdued(d, def, dt, now); return; }
   if (d.state === 'flee') { stepFlee(d, def, dt); return; }
-  if (def.behavior === 'aggressive') { stepAggressive(d, def, dt, now); return; }
+  // Aggressive dinos hunt; a provoked defensive herbivore charges until it cools.
+  if (def.behavior === 'aggressive' || (def.defensive && d.provokedT > 0)) {
+    stepAggressive(d, def, dt, now); return;
+  }
   wander(d, def, dt);
   walkOnGround(d, def);
 }
@@ -441,7 +483,7 @@ export function wireDinos() {
     i: d.id, sp: d.sp,
     x: Math.round(d.x), y: Math.round(d.y), f: d.face, s: d.state,
     tm: Math.round(d.tame * 100) / 100, o: d.owner, h: Math.round(d.hp),
-    nm: d.name, r: d.rider ? 1 : 0,
+    nm: d.name, r: d.rider ? 1 : 0, kd: d.subdued ? 1 : 0,
   }));
 }
 
@@ -452,15 +494,32 @@ export function attack(p, m) {
   if (!d) return;
   if (d.owner) { toast(p, `${d.name} is tamed — leave it be`); return; }
   if (!swingReady(p)) return;
-  if (Math.abs(dinoCenter(d) - playerCenter(p)) > HARVEST_RANGE + DINODEFS[d.sp].w / 2) return;
+  const def = DINODEFS[d.sp];
+  if (Math.abs(dinoCenter(d) - playerCenter(p)) > HARVEST_RANGE + def.w / 2) return;
+
+  const subdueTame = def.tame && def.tame.method === 'subdue';
+  if (d.subdued) { // already down — don't club your would-be tame to death
+    const f = def.tame.food === 'berry' ? 'berries' : 'raw meat';
+    toast(p, `${def.name} is down — feed it ${f} (E)`);
+    return;
+  }
 
   // A gun is not a melee weapon — pistol-whipping does bare-hand damage, no ammo.
   const tool = playerTool(p);
   d.hp -= (tool === 'gun' ? WEAPON_DMG.hand : WEAPON_DMG[tool]) || WEAPON_DMG.hand;
-  if (d.tame > 0) d.tame = 0;
-  const def = DINODEFS[d.sp];
+  if (d.tame > 0 && !subdueTame) d.tame = 0; // passive taming resets when hit
   reactToAttack(d, def, p);
   broadcast({ t: 'fx', kind: 'hit', x: dinoCenter(d), y: d.y + 10 });
+
+  // Carnivore training: melee never kills a tameable target — it knocks out
+  // once its hp crosses the subdue threshold, so you can't fumble the tame.
+  if (subdueTame) {
+    if (d.hp <= def.hp * def.tame.subdueFrac) {
+      if (d.hp < 1) d.hp = 1;
+      subdue(d, def, p);
+    }
+    return;
+  }
   if (d.hp <= 0) killDino(d, p);
 }
 
@@ -500,28 +559,39 @@ export function feed(p, m) {
   if (!def.tame) { toast(p, `${def.name}s can't be tamed that way`); return; }
   if (Math.abs(dinoCenter(d) - playerCenter(p)) > INTERACT_RANGE + def.w / 2) return;
 
+  const subdueTame = def.tame.method === 'subdue';
+  if (subdueTame && !d.subdued) {
+    toast(p, `Knock the ${def.name.toLowerCase()} out first — wear it down, don't kill it.`);
+    return;
+  }
+
   const now = Date.now();
   if (now - d.lastFedAt < def.tame.cooldownS * 1000) {
     toast(p, `The ${def.name.toLowerCase()} is still munching…`);
     return;
   }
   if (!invRemove(p.inv, def.tame.food, 1)) {
-    toast(p, `You need ${def.tame.food === 'berry' ? 'berries' : def.tame.food} to tame it`);
+    toast(p, `You need ${def.tame.food === 'berry' ? 'berries' : 'raw meat'} to tame it`);
     return;
   }
   d.lastFedAt = now;
   d.tame += 1 / def.tame.feeds;
-  d.state = 'idle';
-  d.stateT = def.tame.cooldownS;
+  if (subdueTame) {
+    d.subduedUntil = now + SUBDUE_WINDOW_MS; // feeding keeps it under
+  } else {
+    d.state = 'idle';
+    d.stateT = def.tame.cooldownS;
+  }
   broadcast({ t: 'fx', kind: 'heart', x: dinoCenter(d), y: d.y - 6 });
   sendInv(p);
 
   if (d.tame >= 1) {
     d.tame = 1;
     d.owner = p.name;
+    d.subdued = false;
     d.state = 'follow';
     if (def.egg) d.eggAt = now + randInt(def.egg[0], def.egg[1]) * 1000;
-    broadcast({ t: 'chat', from: '', text: `${p.name} tamed a ${def.name}!` });
+    broadcast({ t: 'chat', from: '', text: `${p.name} ${subdueTame ? 'trained' : 'tamed'} a ${def.name}!` });
     toast(p, def.rideable
       ? `${def.name} tamed! It guards you. T follow/stay · R to ride.`
       : `${def.name} tamed! It follows and guards you — T to make it stay.`);

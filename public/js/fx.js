@@ -64,6 +64,7 @@ on('node', (m) => {
 
 on('fx', (m) => {
   if (m.kind === 'heart') addHeart(m.x, m.y);
+  if (m.kind === 'star') { addFloat('KO!', '#ffe08a', m.x, m.y); addPuff(m.x, m.y, '#ffe08a', 9); }
   if (m.kind === 'poof') addPuff(m.x, m.y, '#cfd4e0', 12);
   if (m.kind === 'hit') addPuff(m.x, m.y, '#e0654e', 5);
   if (m.kind === 'muzzle') addPuff(m.x, m.y, '#ffe08a', 5);
