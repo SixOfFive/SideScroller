@@ -28,10 +28,18 @@ export const ITEMS = {
   metal_chest:  { name: 'Metal Chestplate', armor: { slot: 'chest', v: 24 } },
   metal_legs:   { name: 'Metal Leggings',   armor: { slot: 'legs',  v: 18 } },
   metal_boots:  { name: 'Metal Boots',      armor: { slot: 'feet',  v: 12 } },
+  // Dino barding: strap onto a tamed dino to cut the damage it takes. dinoArmor.v
+  // is a straight damage-reduction fraction (0..1).
+  hide_barding:  { name: 'Hide Barding',  dinoArmor: { v: 0.20 } },
+  metal_barding: { name: 'Metal Barding', dinoArmor: { v: 0.45 } },
 };
 
 export function isArmor(id) {
   return isItem(id) && !!ITEMS[id].armor;
+}
+
+export function isDinoArmor(id) {
+  return isItem(id) && !!ITEMS[id].dinoArmor;
 }
 
 // Own-property check so ids like '__proto__' or 'constructor' never resolve

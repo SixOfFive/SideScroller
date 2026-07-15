@@ -14,7 +14,7 @@ import { invAdd, invRemove, invCount, invPayCost } from './inventory.js';
 import { harvest } from './harvest.js';
 import { build, demolish } from './building.js';
 import { use } from './interact.js';
-import { attack, feed, dinoCmd, setRideInput, shoot } from './dinos.js';
+import { attack, feed, dinoCmd, setRideInput, shoot, bardDino } from './dinos.js';
 
 const ARMOR_SLOTS = ['head', 'chest', 'legs', 'feet'];
 
@@ -113,8 +113,8 @@ const HANDLERS = {
     for (const k of ['hunger', 'thirst', 'damage', 'instantTame']) {
       if (typeof m[k] === 'boolean' && s[k] !== m[k]) { s[k] = m[k]; changed = true; }
     }
-    // AI survivor count (0..4 — matches MAX_BOTS; bots.js applies the change).
-    if (Number.isInteger(m.bots) && m.bots >= 0 && m.bots <= 4 && s.bots !== m.bots) {
+    // AI survivor count (0..15 — matches MAX_BOTS in bots.js; that module applies the change).
+    if (Number.isInteger(m.bots) && m.bots >= 0 && m.bots <= 15 && s.bots !== m.bots) {
       s.bots = m.bots;
       changed = true;
     }
@@ -135,7 +135,7 @@ const HANDLERS = {
     }
   },
 
-  harvest, build, demolish, use, attack, feed, dinoCmd, shoot,
+  harvest, build, demolish, use, attack, feed, dinoCmd, shoot, bardDino,
 };
 
 export function route(p, msg) {

@@ -15,13 +15,18 @@ import { WORLD_W, PLAYER_W, PLAYER_H, STATS_MAX, MOVE_SPEED } from '../shared/co
 import { clampStrait } from '../shared/regions.js';
 import { groundTop, streamsIn, STREAM_HALF } from '../shared/terrain.js';
 
-export const MAX_BOTS = 4;
+export const MAX_BOTS = 15;
 
-// ARK Explorer-Notes survivors. Homes stay in survivable country (meadow edge
-// and forest) — deep-region camps just got the early bots killed on repeat.
-// The 4th dares the highlands edge.
-const BOT_NAMES = ['Helena', 'Rockwell', 'Mei Yin', 'Santiago', 'Raia', 'Dahkeya'];
-const HOME_SPOTS = [2620, 4180, 5860, 6760, 9740, 12160];
+// ARK Explorer-Notes survivors and camp-mates. Homes spread across the mainland
+// danger gradient (meadow edge -> deep wilds); each bot rebuilds where it lands.
+const BOT_NAMES = [
+  'Helena', 'Rockwell', 'Mei Yin', 'Santiago', 'Raia', 'Dahkeya', 'Nerva', 'Diana',
+  'Edmund', 'Kang', 'Ari', 'Lira', 'Cael', 'Bran', 'Tuok',
+];
+const HOME_SPOTS = [
+  2620, 4180, 5860, 6760, 9740, 12160, 3360, 5100,
+  7480, 8600, 10600, 11500, 13100, 2980, 6300,
+];
 
 const BOT_SPEED = MOVE_SPEED * 0.85; // a touch slower than players, still outruns raptors
 

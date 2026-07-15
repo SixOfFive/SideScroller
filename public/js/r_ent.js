@@ -157,6 +157,7 @@ const LOOK = {
   rex:      { hue: 20,  sat: 42, jaw: 1.5, crest: 0, frill: 0, tail: 1.0, arm: 0.25, teeth: 1 },
   carno:    { hue: 10,  sat: 46, jaw: 1.2, crest: 0, frill: 0, tail: 1.05, arm: 0.2, teeth: 1, claw: 1 },
   troodon:  { hue: 128, sat: 46, jaw: 0.8, crest: 0, frill: 0, tail: 1.28, arm: 0.6, teeth: 1, claw: 1 },
+  giga:     { hue: 348, sat: 24, jaw: 1.8, crest: 0, frill: 0, tail: 1.12, arm: 0.3, teeth: 1, claw: 1 },
 };
 
 // Per-species quadruped params (trike/sarco/sabertooth): body color + head kit.
@@ -391,6 +392,61 @@ function drawQuadruped(ctx, d, def, look, h, br, t) {
   ctx.beginPath(); ctx.arc(headX + W * 0.02, headY - H * 0.02, Math.max(2, H * 0.032), 0, 7); ctx.fill();
 }
 
+// The bronto: a long-necked sauropod filling [0,-H]x[±W/2], facing +x, feet
+// at y=0. A walking mountain — small head atop a long up-curved neck, huge
+// body on four pillar legs, and a long tail sweeping down behind.
+function drawSauropod(ctx, d, def, h, br, t) {
+  const W = def.w, H = def.h;
+  const indiv = (hash01(h) - 0.5) * 8;
+  const hue = 268 + indiv, sat = 16;
+  const L = (l) => Math.max(0, Math.min(100, l * (0.42 + br * 0.58)));
+  const body = `hsl(${hue}, ${sat}%, ${L(42)}%)`;
+  const dark = `hsl(${hue}, ${sat}%, ${L(30)}%)`;
+  const belly = `hsl(${hue}, ${sat - 4}%, ${L(55)}%)`;
+  const moving = d.s === 'walk' || d.s === 'flee' || d.s === 'follow' || d.s === 'chase' || d.s === 'ridden';
+  const gait = moving ? Math.sin(t * 0.011 + h) : 0;
+  const backY = -H * 0.58;
+  const hipY = -H * 0.30;
+
+  // tail: heavy, sweeps from the rump back and down to the ground
+  ctx.strokeStyle = dark; ctx.lineWidth = H * 0.13; ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(-W * 0.22, backY + H * 0.16);
+  ctx.quadraticCurveTo(-W * 0.46, hipY + H * 0.06, -W * 0.62, -H * 0.01);
+  ctx.stroke();
+
+  // far legs (behind, darker)
+  ctx.strokeStyle = dark; ctx.lineWidth = Math.max(7, W * 0.05); ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(-W * 0.14, hipY); ctx.lineTo(-W * 0.14 - gait * W * 0.02, -2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(W * 0.16, hipY); ctx.lineTo(W * 0.16 + gait * W * 0.02, -2); ctx.stroke();
+
+  // body: a great rounded mass
+  ctx.fillStyle = body;
+  ctx.beginPath(); ctx.ellipse(-W * 0.02, (backY + hipY) / 2, W * 0.38, (hipY - backY) / 2 + H * 0.06, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = belly;
+  ctx.beginPath(); ctx.ellipse(0, hipY + H * 0.02, W * 0.30, H * 0.11, 0, 0, 7); ctx.fill();
+
+  // near legs (front, lighter, animated)
+  ctx.strokeStyle = body; ctx.lineWidth = Math.max(8, W * 0.055);
+  ctx.beginPath(); ctx.moveTo(-W * 0.06, hipY); ctx.lineTo(-W * 0.06 + gait * W * 0.02, -2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(W * 0.24, hipY); ctx.lineTo(W * 0.24 - gait * W * 0.02, -2); ctx.stroke();
+
+  // neck: long, curving up and forward from the shoulders to a small head
+  const headX = W * 0.52, headY = backY - H * 0.30;
+  ctx.strokeStyle = body; ctx.lineWidth = H * 0.15; ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(W * 0.24, backY + H * 0.02);
+  ctx.quadraticCurveTo(W * 0.46, backY - H * 0.10, headX, headY);
+  ctx.stroke();
+
+  // small head + blunt snout
+  ctx.fillStyle = body;
+  ctx.beginPath(); ctx.ellipse(headX, headY, W * 0.055, H * 0.06, 0.2, 0, 7); ctx.fill();
+  ctx.fillRect(headX + W * 0.02, headY - H * 0.02, W * 0.05, H * 0.045);
+  ctx.fillStyle = '#1b1b1b';
+  ctx.beginPath(); ctx.arc(headX + W * 0.03, headY - H * 0.015, Math.max(2, H * 0.018), 0, 7); ctx.fill();
+}
+
 // Dodo keeps its round-bird look; everything else is a theropod.
 function drawDodo(ctx, d, def, h, br, t) {
   const hue = 25 + hash01(h) * 30;
@@ -435,6 +491,7 @@ export function drawDino(ctx, x, y, d, br, t) {
   ctx.scale(d.f < 0 ? -1 : 1, 1);
   if (d.kd) ctx.globalAlpha = 0.7; // knocked out: washed out
   if (d.sp === 'dodo' || !d.sp) drawDodo(ctx, d, def, h, br, t);
+  else if (def.shape === 'sauropod') drawSauropod(ctx, d, def, h, br, t);
   else if (def.shape === 'quadruped') drawQuadruped(ctx, d, def, QLOOK[d.sp] || QLOOK.sarco, h, br, t);
   else drawTheropod(ctx, d, def, LOOK[d.sp] || LOOK.compy, h, br, t);
   ctx.restore();
@@ -444,7 +501,7 @@ export function drawDino(ctx, x, y, d, br, t) {
     ctx.font = '600 11px sans-serif';
     ctx.textAlign = 'center';
     ctx.fillStyle = '#9be09b';
-    ctx.fillText(`${d.nm || def.name} (${d.o})${d.s === 'stay' ? ' ⏸' : ''}`, cx, y - 12);
+    ctx.fillText(`${d.nm || def.name} (${d.o})${d.bd ? ' 🛡' : ''}${d.s === 'stay' ? ' ⏸' : ''}`, cx, y - 12);
     // health bar for your tame — always shown so you can watch a guard pet mid-fight
     if (d.h !== undefined) {
       const frac = Math.max(0, Math.min(1, d.h / def.hp));

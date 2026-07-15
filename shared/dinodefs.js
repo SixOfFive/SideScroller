@@ -103,6 +103,31 @@ export const DINODEFS = {
     tame: { method: 'subdue', food: 'berry', feeds: 10, cooldownS: 6, subdueFrac: 0.35 },
     egg: [300, 420],
   },
+
+  // --- the mobile stronghold: a huge sauropod. Knock it down (it tail-swipes
+  //     back, so it is a real fight), then feed berries. Rideable, carries a
+  //     large built-in stash, and anchors a "dino base". -----------------------
+  bronto: {
+    name: 'Bronto', w: 244, h: 156, threat: 1, shape: 'sauropod',
+    hp: 1400, speed: 60, fleeSpeed: 74,
+    behavior: 'passive', defensive: true,
+    dmg: 40, attackRange: 130, attackCd: 1.9, aggro: 430,
+    drops: { raw_meat: [12, 18], hide: [12, 18] },
+    tame: { method: 'subdue', food: 'berry', feeds: 16, cooldownS: 6, subdueFrac: 0.42 },
+    rideable: true, rideSpeed: 150, rideJump: 360,
+    stash: 48, // built-in mobile storage (deposit/withdraw like a box)
+    egg: [520, 760],
+  },
+
+  // --- the apex. Massive, fast for its size, hits like a truck, and sees you
+  //     coming from a screen away. An encounter is very bad news; it lives only
+  //     in the deep expedition frontier. Not tameable. ------------------------
+  giga: {
+    name: 'Giganotosaurus', w: 224, h: 168, threat: 5,
+    hp: 1300, speed: 150, fleeSpeed: 150,
+    behavior: 'aggressive', dmg: 120, aggro: 900, attackRange: 140, attackCd: 1.5,
+    drops: { raw_meat: [18, 26], hide: [14, 22] },
+  },
 };
 
 // Player melee damage by equipped tool type (metal + guns arrive in the tech

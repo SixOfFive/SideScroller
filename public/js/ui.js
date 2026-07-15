@@ -29,7 +29,8 @@ const ITEM_ORDER = ['wood', 'thatch', 'stone', 'flint', 'fiber', 'hide',
   'metal_ore', 'metal_ingot', 'charcoal', 'gunpowder', 'bullet',
   'berry', 'egg', 'raw_meat', 'cooked_meat',
   'stone_axe', 'stone_pick', 'spear', 'metal_axe', 'metal_pick', 'sword', 'rifle',
-  'metal_helmet', 'metal_chest', 'metal_legs', 'metal_boots'];
+  'metal_helmet', 'metal_chest', 'metal_legs', 'metal_boots',
+  'hide_barding', 'metal_barding'];
 
 const ARMOR_SLOTS = [['head', 'Head'], ['chest', 'Chest'], ['legs', 'Legs'], ['feet', 'Feet']];
 
@@ -92,6 +93,12 @@ function refreshInv() {
     if (def.armor) {
       const b = el('button', '', 'Wear');
       b.onclick = () => sendMsg({ t: 'wear', item: id });
+      row.append(b);
+    }
+    if (def.dinoArmor) {
+      const b = el('button', '', 'Bard dino');
+      b.title = 'Strap onto your nearest tamed dino';
+      b.onclick = () => sendMsg({ t: 'bardDino', item: id });
       row.append(b);
     }
     left.append(row);
@@ -357,14 +364,14 @@ function refreshOptions() {
   const botRow = el('div', 'itemrow');
   botRow.append(el('span', 'nm', 'AI survivors'));
   const bsel = el('select');
-  for (const v of [0, 1, 2, 3, 4]) {
+  for (let v = 0; v <= 15; v++) {
     const o = el('option', '', v === 0 ? 'None' : String(v));
     o.value = v;
     if ((state.settings.bots ?? 0) === v) o.selected = true;
     bsel.append(o);
   }
   bsel.onchange = () => sendMsg({ t: 'setSettings', bots: Number(bsel.value) });
-  botRow.append(bsel, el('span', 'cost', 'computer survivors that build and roam'));
+  botRow.append(bsel, el('span', 'cost', 'computer survivors that build and roam (up to 15)'));
   panel.append(botRow);
 
   panel.append(el('h3', '', 'Local'));

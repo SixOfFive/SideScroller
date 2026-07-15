@@ -98,6 +98,16 @@ export const RECIPES = {
     cost: { metal_ingot: 10, wood: 8, fiber: 12 },
     desc: 'Ranged firepower. Equip it, needs bullets. Even a rex fears it.',
   },
+  hide_barding: {
+    name: 'Hide Barding', gives: { hide_barding: 1 }, tier: 2,
+    cost: { hide: 14, fiber: 20 },
+    desc: 'Straps onto a tamed dino (Bard from inventory) — cuts 20% of the damage it takes.',
+  },
+  metal_barding: {
+    name: 'Metal Barding', gives: { metal_barding: 1 }, tier: 2,
+    cost: { metal_ingot: 14, hide: 10 },
+    desc: 'Heavy dino plating — cuts 45% of the damage your tame takes. Keeps a bronto base standing.',
+  },
 };
 
 export const BUILDABLES = Object.keys(RECIPES).filter((k) => RECIPES[k].structure);

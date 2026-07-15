@@ -144,6 +144,12 @@ function armorReduction(p) {
   return Math.min(0.78, total / 90);
 }
 
+// Damage reduction from a tamed dino's barding (0..~0.45). No barding = 0.
+function dinoArmorReduction(d) {
+  const it = d.barding;
+  return it && ITEMS[it] && ITEMS[it].dinoArmor ? ITEMS[it].dinoArmor.v : 0;
+}
+
 // Count living wild same-species dinos near d (including itself).
 function packCount(d) {
   let n = 0;
@@ -210,7 +216,7 @@ function bite(d, p, def, now) {
   // A mounted rider is shielded — the mount soaks the hit instead.
   if (p.mount && world.dinos.has(p.mount)) {
     const mount = world.dinos.get(p.mount);
-    mount.hp -= def.dmg;
+    mount.hp -= def.dmg * (1 - dinoArmorReduction(mount)); // barding protects the mount
     broadcast({ t: 'fx', kind: 'hit', x: dinoCenter(mount), y: mount.y + 20 });
     if (mount.hp <= 0) killDino(mount, null);
     return;
@@ -356,7 +362,8 @@ function stepAggressive(d, def, dt, now) {
       d.state = 'attack';
       if (now - d.lastBite >= def.attackCd * 1000 && world.settings.damage) {
         d.lastBite = now;
-        foe.hp -= def.dmg * (1 - GUARD_RESIST); // pets shrug off some of it on duty
+        // pets shrug off some on duty (GUARD_RESIST), barding cuts more
+        foe.hp -= def.dmg * (1 - GUARD_RESIST) * (1 - dinoArmorReduction(foe));
         broadcast({ t: 'fx', kind: 'hit', x: dinoCenter(foe), y: foe.y + 15 });
         if (foe.hp <= 0) {
           broadcast({ t: 'chat', from: '', text: `${foe.owner}'s ${foe.name} died protecting its owner.` });
@@ -508,6 +515,7 @@ export function wireDinos() {
       x: Math.round(d.x), y: Math.round(d.y), f: d.face, s: d.state,
       tm: Math.round(d.tame * 100) / 100, o: d.owner, h: Math.round(d.hp),
       nm: d.name, r: d.rider ? 1 : 0, kd: d.subdued ? 1 : 0, fc,
+      bd: d.barding ? 1 : 0,
     };
   });
 }
@@ -628,6 +636,27 @@ export function feed(p, m) {
       ? `${def.name} tamed! It guards you. T follow/stay · R to ride.`
       : `${def.name} tamed! It follows and guards you — T to make it stay.`);
   }
+}
+
+// Strap barding onto your nearest tame (button in the inventory panel). No dino
+// id needed — the server picks the closest tame of yours in reach.
+export function bardDino(p, m) {
+  const item = typeof m.item === 'string' ? m.item : '';
+  if (!ITEMS[item] || !ITEMS[item].dinoArmor) return;
+  if ((p.inv[item] || 0) < 1) { toast(p, `No ${ITEMS[item].name} to equip`); return; }
+  let best = null, bd = Infinity;
+  const cx = playerCenter(p);
+  for (const d of world.dinos.values()) {
+    if (d.owner !== p.name) continue;
+    const dist = Math.abs(dinoCenter(d) - cx);
+    if (dist <= INTERACT_RANGE + DINODEFS[d.sp].w / 2 && dist < bd) { bd = dist; best = d; }
+  }
+  if (!best) { toast(p, 'Stand next to one of your tames to bard it'); return; }
+  if (best.barding) invAdd(p.inv, best.barding, 1); // swap the old plating back to you
+  invRemove(p.inv, item, 1);
+  best.barding = item;
+  sendInv(p);
+  toast(p, `${best.name} is wearing ${ITEMS[item].name}`);
 }
 
 export function dinoCmd(p, m) {

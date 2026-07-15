@@ -34,7 +34,7 @@ export const REGIONS = [
     key: 'wilds', name: 'Deep Wilds', danger: 3,
     baseY: 582, rough: 0.75, grass: [64, 116, 62],
     nodes: [0.30, 0.24, 0.12, 0.12, 0.22],
-    dinos: [{ sp: 'dilo', w: 3 }, { sp: 'raptor', w: 3 }, { sp: 'parasaur', w: 2 }, { sp: 'carno', w: 2 }, { sp: 'rex', w: 1 }],
+    dinos: [{ sp: 'dilo', w: 3 }, { sp: 'raptor', w: 3 }, { sp: 'parasaur', w: 2 }, { sp: 'carno', w: 2 }, { sp: 'bronto', w: 1 }, { sp: 'rex', w: 1 }],
   },
   {
     key: 'badlands', name: 'Scorched Badlands', danger: 4,
@@ -53,7 +53,7 @@ export const REGIONS = [
     key: 'jungle', name: 'Verdant Canopy', danger: 2, isle: true,
     baseY: 596, rough: 0.7, grass: [52, 150, 66],
     nodes: [0.60, 0.06, 0.20, 0.04, 0.10],
-    dinos: [{ sp: 'troodon', w: 3 }, { sp: 'compy', w: 2 }, { sp: 'raptor', w: 2 }, { sp: 'parasaur', w: 2 }, { sp: 'trike', w: 1 }],
+    dinos: [{ sp: 'troodon', w: 3 }, { sp: 'compy', w: 2 }, { sp: 'raptor', w: 2 }, { sp: 'parasaur', w: 2 }, { sp: 'trike', w: 1 }, { sp: 'bronto', w: 1 }],
   },
   {
     key: 'glacier', name: 'Frozen Reach', danger: 3, isle: true,
@@ -71,7 +71,7 @@ export const REGIONS = [
     key: 'volcano', name: 'Emberpeak', danger: 5, isle: true,
     baseY: 598, rough: 1.0, grass: [96, 68, 60],
     nodes: [0.06, 0.42, 0.02, 0.34, 0.16],
-    dinos: [{ sp: 'rex', w: 3 }, { sp: 'carno', w: 3 }, { sp: 'raptor', w: 2 }],
+    dinos: [{ sp: 'rex', w: 3 }, { sp: 'carno', w: 3 }, { sp: 'raptor', w: 2 }, { sp: 'giga', w: 1 }],
   },
 ];
 
