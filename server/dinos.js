@@ -14,7 +14,10 @@ import { swingReady, playerTool } from './harvest.js';
 import { nearStructure } from './worldgen.js';
 
 const SPAWN_CHECK_S = 8;
-const REGION_TARGET = [4, 5, 6, 6, 6]; // wild dinos alive per region band
+// Wild dinos alive per region band — one entry per REGIONS band. The strait (5)
+// stays 0; the outer isles (6-9) MUST have targets or maybeSpawn never refills
+// them (counts[i] < undefined is always false).
+const REGION_TARGET = [4, 5, 6, 6, 6, 0, 5, 6, 5, 6];
 const PLAYER_CLEARANCE = 620;
 const SAFE_X = REGION_W;                // aggressive dinos won't cross into the meadow
 
