@@ -110,6 +110,11 @@ const HANDLERS = {
     for (const k of ['hunger', 'thirst', 'damage']) {
       if (typeof m[k] === 'boolean' && s[k] !== m[k]) { s[k] = m[k]; changed = true; }
     }
+    // AI survivor count (0..4 — matches MAX_BOTS; bots.js applies the change).
+    if (Number.isInteger(m.bots) && m.bots >= 0 && m.bots <= 4 && s.bots !== m.bots) {
+      s.bots = m.bots;
+      changed = true;
+    }
     if ([240, 480, 960].includes(m.dayLen) && m.dayLen !== s.dayLen) {
       // Preserve the current day phase so the nightfall gate can't jump and
       // fire the chunk re-roll many times (or skip it) when day length changes.

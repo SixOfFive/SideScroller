@@ -284,6 +284,19 @@ function refreshOptions() {
   dayRow.append(sel);
   panel.append(dayRow);
 
+  const botRow = el('div', 'itemrow');
+  botRow.append(el('span', 'nm', 'AI survivors'));
+  const bsel = el('select');
+  for (const v of [0, 1, 2, 3, 4]) {
+    const o = el('option', '', v === 0 ? 'None' : String(v));
+    o.value = v;
+    if ((state.settings.bots ?? 0) === v) o.selected = true;
+    bsel.append(o);
+  }
+  bsel.onchange = () => sendMsg({ t: 'setSettings', bots: Number(bsel.value) });
+  botRow.append(bsel, el('span', 'cost', 'computer survivors that build and roam'));
+  panel.append(botRow);
+
   panel.append(el('h3', '', 'Local'));
   const muteRow = el('div', 'itemrow');
   const mcb = el('input');

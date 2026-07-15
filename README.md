@@ -58,7 +58,13 @@ Close the window or press Ctrl+C to stop it.
 - Metal tier: forge smelts ore into ingots (charcoal byproduct) → metal tools,
   a full armor set (up to 78% damage reduction), gunpowder, bullets, rifle.
 - All sound is generated at runtime with WebAudio — no audio files. M mutes.
-- ESC opens options: toggle hunger/thirst/dino damage, day length, quit.
+- ESC opens options: toggle hunger/thirst/dino damage, day length, AI survivor
+  count, quit.
+- **AI survivors** share the island: computer players (Helena, Rockwell,
+  Mei Yin, Santiago) who gather, craft, build their own camps, hunt, tame
+  dodos, and push toward metal — dying and rebuilding just like everyone else.
+  They eat, drink from streams, flee raptors, camp by their fires at night,
+  and their progress persists in the world save.
 
 ## Roadmap
 
@@ -67,4 +73,6 @@ Close the window or press Ctrl+C to stop it.
 - [x] Expansion: terrain/streams, combat roster (compy/dilo/parasaur/raptor/rex),
       portals + region hub, night re-randomization, metal tier + rifle,
       thirst, ESC options, procedural sound
-- [ ] Later: saddles + more mounts, ranged dinos, boss arenas, map gating tiers
+- [x] AI survivors: computer players that progress through the same tech tree
+- [ ] Later: saddles + more mounts, ranged dinos, boss arenas, map gating tiers,
+      bots using portals / rifles / armor

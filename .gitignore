@@ -1,5 +1,6 @@
 node_modules/
 data/
+data-*/
 *.log
 bat-out.txt
 bat-err.txt

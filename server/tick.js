@@ -10,6 +10,7 @@ import {
 import { groundAt } from '../shared/terrain.js';
 import { send, sendStats, broadcast, wirePlayer } from './net.js';
 import { updateDinos, wireDinos } from './dinos.js';
+import { updateBots } from './bots.js';
 import { rollUnoccupiedChunks } from './chunks.js';
 
 let tickCount = 0;
@@ -100,6 +101,7 @@ function step() {
   }
 
   updateDinos(dt, now);
+  updateBots(dt);
 
   tickCount++;
   if (tickCount % Math.round(TICK_HZ / SNAP_HZ) === 0) {

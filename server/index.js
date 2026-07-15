@@ -7,6 +7,7 @@ import { route } from './handlers.js';
 import { loadWorld, saveWorld } from './state.js';
 import { generateWorld } from './worldgen.js';
 import { setupPortals } from './portals.js';
+import { initBots } from './bots.js';
 import { startTick } from './tick.js';
 
 if (loadWorld()) {
@@ -15,6 +16,7 @@ if (loadWorld()) {
   generateWorld(WORLD_SEED);
 }
 setupPortals(); // world fixtures, rebuilt fresh every boot
+initBots();     // AI survivors (count lives in world.settings.bots)
 
 const server = createServer(serveStatic);
 initNet(server, route);

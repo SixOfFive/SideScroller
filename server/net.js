@@ -84,7 +84,10 @@ function doJoin(ws, msg) {
       break;
     }
   }
-  if (world.players.size >= MAX_PLAYERS) {
+  // AI survivors don't hold a human slot.
+  let humans = 0;
+  for (const o of world.players.values()) if (!o.bot) humans++;
+  if (humans >= MAX_PLAYERS) {
     return refuse(ws, `Server full (${MAX_PLAYERS} max)`);
   }
 

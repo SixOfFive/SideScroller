@@ -14,6 +14,7 @@ const OCCUPY_MARGIN = 900;                // ~a screen; don't re-roll near playe
 
 function occupied(x0, x1) {
   for (const p of world.players.values()) {
+    if (p.bot) continue; // AI survivors don't hold chunks fresh
     if (p.x >= x0 - OCCUPY_MARGIN && p.x <= x1 + OCCUPY_MARGIN) return true;
   }
   return false;
