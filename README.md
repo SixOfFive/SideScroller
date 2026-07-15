@@ -64,7 +64,8 @@ Close the window or press Ctrl+C to stop it.
   a full armor set (up to 78% damage reduction), gunpowder, bullets, rifle.
 - All sound is generated at runtime with WebAudio — no audio files. M mutes.
 - ESC opens options: toggle hunger/thirst/dino damage, day length, AI survivor
-  count, quit.
+  count, quit — and **rebind every key** (click the key, press the new one;
+  saved per browser, Esc stays fixed, arrows/W/Tab remain built-in extras).
 - **AI survivors** share the island: computer players (Helena, Rockwell,
   Mei Yin, Santiago) who gather, craft, build their own camps, hunt, tame
   dodos, and push toward metal — dying and rebuilding just like everyone else.

@@ -3,6 +3,7 @@
 import { on, sendMsg } from './net.js';
 import { state } from './state.js';
 import { sfx, setMute } from './sound.js';
+import { labelFor, setBind, resetBinds } from './input.js';
 import { ITEMS, itemName, isArmor } from '/shared/items.js';
 import { RECIPES, CRAFTABLES, BUILDABLES } from '/shared/recipes.js';
 
@@ -231,13 +232,16 @@ export function cancelBuild() {
 
 // --- help -----------------------------------------------------------------------
 
-const HELP_HTML = `
+// Rendered fresh on every open so rebound keys show their real labels.
+const kbd = (a) => `<span class="kbd">${labelFor(a)}</span>`;
+const helpHTML = () => `
 <h2>How to survive</h2>
-<p><span class="kbd">A</span>/<span class="kbd">D</span> move · <span class="kbd">Space</span> jump · <span class="kbd">click</span>/<span class="kbd">F</span> harvest &amp; attack</p>
-<p><span class="kbd">1</span>–<span class="kbd">4</span> tools · <span class="kbd">Tab</span> inventory &amp; crafting · <span class="kbd">Q</span> build bar · <span class="kbd">G</span> quick-eat</p>
-<p><span class="kbd">E</span> interact (light campfire / open box / feed dodo) · <span class="kbd">C</span> cook meat · <span class="kbd">X</span> demolish · <span class="kbd">T</span> dodo follow/stay</p>
-<p><span class="kbd">R</span> ride a tamed parasaur · <span class="kbd">M</span> mute sounds · <span class="kbd">Enter</span> chat · <span class="kbd">Esc</span> options/quit · <span class="kbd">H</span> close this help</p>
-<p>Keep an eye on your <b>water bar</b> — drink from streams (<span class="kbd">E</span> while standing in one) or eat berries.</p>
+<p>${kbd('moveLeft')}/${kbd('moveRight')} move · ${kbd('jump')} jump · <span class="kbd">click</span>/${kbd('swing')} harvest &amp; attack</p>
+<p>${kbd('equip1')}–${kbd('equip4')} tools · ${kbd('toggleInv')} inventory &amp; crafting · ${kbd('toggleBuild')} build bar · ${kbd('eatQuick')} quick-eat</p>
+<p>${kbd('interact')} interact (light campfire / open box / feed dodo) · ${kbd('cook')} cook meat · ${kbd('demolish')} demolish · ${kbd('dinoToggle')} dodo follow/stay</p>
+<p>${kbd('mount')} ride a tamed parasaur · ${kbd('muteToggle')} mute sounds · ${kbd('chat')} chat · <span class="kbd">Esc</span> options/quit · ${kbd('toggleHelp')} close this help</p>
+<p>Keep an eye on your <b>water bar</b> — drink from streams (${kbd('interact')} while standing in one) or eat berries.
+Keys can be rebound in the options menu (<span class="kbd">Esc</span>).</p>
 <h3>The loop</h3>
 <p>Punch trees for thatch and wood, grab stones off the ground. Craft a Stone Axe
 and Pick — better tools mean way more resources per swing, just like ARK.</p>
@@ -252,10 +256,47 @@ lay eggs.</p>
 export function toggleHelp() {
   const p = $('helpPanel');
   p.classList.toggle('hidden');
-  if (!p.innerHTML) p.innerHTML = HELP_HTML;
+  if (!p.classList.contains('hidden')) p.innerHTML = helpHTML();
 }
 
 // --- ESC options menu -------------------------------------------------------
+
+// Rebindable actions shown in the Controls section, in display order.
+const BIND_ROWS = [
+  ['moveLeft', 'Move left'], ['moveRight', 'Move right'], ['jump', 'Jump'],
+  ['swing', 'Attack / harvest'], ['interact', 'Interact'],
+  ['toggleBuild', 'Build menu'], ['toggleInv', 'Inventory'],
+  ['cook', 'Cook meat'], ['demolish', 'Demolish'], ['eatQuick', 'Quick eat'],
+  ['dinoToggle', 'Pet follow/stay'], ['mount', 'Ride mount'],
+  ['equip1', 'Hands (slot 1)'], ['equip2', 'Axe (slot 2)'],
+  ['equip3', 'Pick (slot 3)'], ['equip4', 'Spear (slot 4)'],
+  ['chat', 'Chat'], ['muteToggle', 'Mute sounds'], ['toggleHelp', 'Help'],
+];
+
+// One live key-grab at a time; canceled if the panel rerenders or closes.
+let grabCancel = null;
+
+function bindRow(action, label) {
+  const row = el('div', 'itemrow');
+  row.append(el('span', 'nm', label));
+  const btn = el('button', 'bindbtn', labelFor(action));
+  btn.onclick = () => {
+    if (grabCancel) grabCancel();
+    btn.textContent = 'press a key…';
+    const grab = (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      cleanup();
+      if (ev.code !== 'Escape') setBind(action, ev.code); // Esc = cancel
+      refreshOptions();
+    };
+    const cleanup = () => { window.removeEventListener('keydown', grab, true); grabCancel = null; };
+    grabCancel = cleanup;
+    window.addEventListener('keydown', grab, true);
+  };
+  row.append(btn);
+  return row;
+}
 
 function settingRow(label, key, hint) {
   const row = el('div', 'itemrow');
@@ -270,6 +311,9 @@ function settingRow(label, key, hint) {
 }
 
 function refreshOptions() {
+  // Any pending key-grab dies with the old buttons — otherwise closing the
+  // panel mid-grab would leave a listener silently rebinding the next key.
+  if (grabCancel) grabCancel();
   const panel = $('optionsPanel');
   if (panel.classList.contains('hidden')) return;
   panel.replaceChildren();
@@ -313,6 +357,16 @@ function refreshOptions() {
   mcb.onchange = () => setMute(mcb.checked);
   muteRow.append(mcb, el('span', 'nm', 'Mute sounds (M)'));
   panel.append(muteRow);
+
+  panel.append(el('h3', '', 'Controls — this browser'));
+  panel.append(el('p', 'cost',
+    'Click a key, then press the new one (Esc cancels). A key taken from another action leaves it as "—". Arrows, W, and Tab stay as built-in extras.'));
+  for (const [action, label] of BIND_ROWS) panel.append(bindRow(action, label));
+  const resetRow = el('div', 'itemrow');
+  const resetBtn = el('button', '', 'Reset default keys');
+  resetBtn.onclick = () => { resetBinds(); refreshOptions(); toast('Keys reset to defaults'); };
+  resetRow.append(resetBtn);
+  panel.append(resetRow);
 
   const btnRow = el('div', 'itemrow');
   const resume = el('button', '', 'Resume (Esc)');
