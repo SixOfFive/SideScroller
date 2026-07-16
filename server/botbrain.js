@@ -14,7 +14,9 @@ import {
   WORLD_W, PLAYER_W, PLAYER_H, HARVEST_RANGE, INTERACT_RANGE, GRID, STATS_MAX,
 } from '../shared/const.js';
 import { inWater, streamsIn } from '../shared/terrain.js';
-import { REGION_W } from '../shared/regions.js';
+import {
+  REGION_W, EXP_BASE, EXP_W, expeditionDepthAt, expeditionZoneX0,
+} from '../shared/regions.js';
 import { invCount, invHas } from './inventory.js';
 import { broadcast } from './net.js';
 
@@ -473,9 +475,140 @@ function chatTick(bot) {
   }
 }
 
+// --- the expedition ambition -------------------------------------------------
+// Established, well-armed "explorer" bots trek to the hub gateway, warp into
+// the frontier, subdue + tame a wild bronto, and hold a dino-base out there —
+// fighting off hostiles and fleeing the giga — before eventually retiring home
+// with the beast. It's a hard, deadly run; dying and trying again is the point.
+
+const EXP_BOT_CAP = 4;          // how many bots may be out in the frontier at once
+const EXP_HOLD_S = 210;         // hold the frontier base this long, then head home
+const GATEWAY_ID = 'pt_exp';
+
+function expeditionBotCount() {
+  let n = 0;
+  for (const p of world.players.values()) if (p.bot && p.ai.exped) n++;
+  return n;
+}
+
+// goto whose target is clamped to a caller-supplied band (the current zone).
+function gotoClamped(bot, x, arrive, clampFn) {
+  if (Math.abs(center(bot) - x) <= arrive) { bot.ai.moveTarget = null; return true; }
+  bot.ai.moveTarget = clampFn(x);
+  return false;
+}
+
+function myBrontoOf(bot) {
+  for (const d of world.dinos.values()) {
+    if (d.owner === bot.name && DINODEFS[d.sp].stash) return d;
+  }
+  return null;
+}
+
+// Decide whether an idle, ladder-complete bot gears up and commits to a run.
+// Returns true if it took this turn (prepping counts). Explorer disposition is
+// rolled once per bot; only some are the adventuring type.
+function maybeEmbark(bot) {
+  const ai = bot.ai;
+  if (ai.expCooldown > 0) { ai.expCooldown -= THINK_S; return false; }
+  if (ai.explorer === undefined) ai.explorer = Math.random() < 0.55;
+  if (!ai.explorer || !haveTool(bot, 'sword')) return false;
+  if (expeditionBotCount() >= EXP_BOT_CAP) return false;
+
+  // Gear up: a FULL metal set (0.78 reduction) — anything less and a bronto's
+  // tail-swipe drops the bot below its own bail threshold mid-subdue.
+  for (const [item, slot] of [['metal_chest', 'chest'], ['metal_helmet', 'head'], ['metal_legs', 'legs'], ['metal_boots', 'feet']]) {
+    if (bot.armorSet[slot]) continue;
+    if (invCount(bot.inv, item) > 0) { route(bot, { t: 'wear', item }); return true; }
+    craftStep(bot, item); return true;
+  }
+  // Stock berries to tame the bronto (~16 feeds) and some food for the trip.
+  if (invCount(bot.inv, 'berry') < 22) { acquire(bot, 'berry'); return true; }
+  if (invCount(bot.inv, 'cooked_meat') < 3) { cookedMeatStep(bot); return true; }
+
+  ai.exped = true; ai.expAnnounced = false; ai.holdT = 0;
+  broadcast({ t: 'chat', from: bot.name, text: pick([
+    'Geared up — into the frontier.', 'Off to tame something huge out east.', 'The deep calls. Hold the camp.',
+  ]) });
+  return true;
+}
+
+// The whole brain while a bot is physically in the frontier (x >= EXP_BASE).
+function expeditionMode(bot) {
+  const ai = bot.ai;
+  ai.wasInExp = true;
+  const cx = center(bot);
+  const depth = expeditionDepthAt(cx);
+  const z0 = expeditionZoneX0(depth);
+  const zc = (x) => clamp(x, z0 + 60, z0 + EXP_W - 60);
+  const homePortal = world.structures.get(`xp_h${depth}`);
+  const homeX = homePortal ? homePortal.x + STRUCTURES.portal.w / 2 : z0 + 100;
+  const warpHome = () => {
+    if (!homePortal) return;
+    if (Math.abs(cx - homeX) <= INTERACT_RANGE) route(bot, { t: 'use', id: homePortal.id, action: 'enter' });
+    else ai.moveTarget = zc(homeX);
+  };
+
+  // eat to stay alive
+  if (world.settings.hunger && bot.hunger < 35) {
+    for (const it of ['cooked_meat', 'egg', 'berry', 'raw_meat']) {
+      if (invCount(bot.inv, it) > 0) { route(bot, { t: 'eat', item: it }); return; }
+    }
+  }
+  if (bot.hp < 34) { warpHome(); return; }                 // badly hurt: bail
+  // an apex (rex/giga) on the prowl is unwinnable — run for the exit
+  if (findWild(bot, (d, def) => def.behavior === 'aggressive' && def.threat >= 4, 760)) { warpHome(); return; }
+
+  const bronto = myBrontoOf(bot);
+  if (bronto) { // hold the base: fight hostiles, patrol near the bronto, then retire
+    if (!ai.expAnnounced) {
+      ai.expAnnounced = true;
+      broadcast({ t: 'chat', from: bot.name, text: pick([
+        'Bronto tamed in the deep!', 'My frontier hold stands.', 'This ground is mine now.',
+      ]) });
+    }
+    const foe = findWild(bot, (d, def) => def.behavior === 'aggressive', 560);
+    if (foe) {
+      const fx = dinoCx(foe);
+      if (gotoClamped(bot, fx, HARVEST_RANGE - 10, zc)) {
+        ensureEquip(bot, bestTool(bot, WEAPONS)); swingAt(bot, fx, { t: 'attack', dino: foe.id });
+      }
+      return;
+    }
+    ai.holdT = (ai.holdT || 0) + THINK_S;
+    if (ai.holdT > EXP_HOLD_S) { warpHome(); return; } // long hold done — head home (the bronto comes too)
+    const bx = dinoCx(bronto);
+    if (Math.abs(cx - bx) > 220) ai.moveTarget = zc(bx);
+    else if (ai.moveTarget == null && Math.random() < 0.2) ai.moveTarget = zc(bx + (Math.random() - 0.5) * 500);
+    return;
+  }
+
+  // no bronto yet: find one and subdue (melee it down) then feed berries
+  const wild = findWild(bot, (d, def) => !!def.stash, 3200);
+  if (!wild) {
+    if (ai.moveTarget == null && Math.random() < 0.4) ai.moveTarget = zc(z0 + 200 + Math.random() * (EXP_W - 400));
+    return;
+  }
+  const wx = dinoCx(wild);
+  if (wild.subdued) {
+    if (invCount(bot.inv, 'berry') < 1) { warpHome(); return; }
+    if (gotoClamped(bot, wx, INTERACT_RANGE + 90, zc)) route(bot, { t: 'feed', dino: wild.id });
+  } else if (gotoClamped(bot, wx, HARVEST_RANGE - 10, zc)) {
+    ensureEquip(bot, bestTool(bot, WEAPONS)); swingAt(bot, wx, { t: 'attack', dino: wild.id });
+  }
+}
+
 // --- the decision pass -------------------------------------------------------------
 
 export function think(bot) {
+  // In the frontier: a dedicated brain takes over entirely.
+  if (center(bot) >= EXP_BASE) { expeditionMode(bot); return; }
+  // Just back on the mainland after a run (warped home or died -> respawned at
+  // the hub): stand down and rest before considering another expedition.
+  if (bot.ai.wasInExp) {
+    bot.ai.wasInExp = false; bot.ai.exped = false; bot.ai.holdT = 0;
+    bot.ai.expAnnounced = false; bot.ai.expCooldown = 120;
+  }
   thinkCore(bot);
   // The border guard runs on EVERY exit path — early returns included. A
   // thirsty bot's drink trek east must not walk into a leash-camped raptor.
@@ -521,6 +654,18 @@ function thinkCore(bot) {
   // 2. survival needs
   if (needsStep(bot)) return;
 
+  // 2b. committed to an expedition run: trek to the hub gateway and warp in.
+  // Danger/flee/needs above still apply on the walk there.
+  if (ai.exped) {
+    const gw = world.structures.get(GATEWAY_ID);
+    if (gw) {
+      const gx = gw.x + STRUCTURES.portal.w / 2;
+      if (goto(bot, gx, INTERACT_RANGE)) route(bot, { t: 'use', id: gw.id, action: 'enter' });
+      return;
+    }
+    ai.exped = false; // no gateway (shouldn't happen) — abort the ambition
+  }
+
   // 3. pick the goal first so the stash chore knows what NOT to deposit
   const goal = GOALS.find((g) => !g.done(bot));
   ai.goalId = goal ? goal.id : 'idle';
@@ -530,7 +675,7 @@ function thinkCore(bot) {
   //    otherwise work the ladder / idle patrol
   if (!stashStep(bot)) {
     if (goal) goal.step(bot);
-    else wanderNear(bot, ai.home);
+    else if (!maybeEmbark(bot)) wanderNear(bot, ai.home); // ladder done: eye the frontier
   }
 
   // 5. after dark, pull it all back to camp
