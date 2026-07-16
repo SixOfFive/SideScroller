@@ -102,21 +102,33 @@ function summarize(bot) {
   const counts = ['wood', 'thatch', 'stone', 'flint', 'fiber', 'berry', 'raw_meat', 'cooked_meat', 'metal_ore', 'metal_ingot', 'hide']
     .map((it) => `${it} ${invCount(inv, it)}`).join(', ');
 
-  // Mirror botbrain's can-gates in plain words — a small model picks gated
-  // goals anyway unless they're called out (the gates re-plan, but that churns).
+  // Mirror botbrain's can-gates AND done-checks in plain words — a small model
+  // picks gated or already-finished goals unless they are called out (the
+  // executor re-plans either way, but that churns the endpoint).
   const blocked = [];
   if (!kinds.campfire) blocked.push('stock_meat (no campfire yet)');
+  else if (invCount(inv, 'cooked_meat') >= 4) blocked.push('stock_meat (already stocked)');
   if (!kinds.forge) blocked.push('craft_metal_tools (no forge yet)');
+  else if (['metal_pick', 'metal_axe', 'sword'].every((t) => invCount(inv, t) > 0)) blocked.push('craft_metal_tools (already made)');
   if (!tools.includes('sword')) blocked.push('go_expedition (no sword yet)');
   else if (bot.ai.expCooldown > 0 || botsOut >= 4) blocked.push('go_expedition (resting or squads full)');
   if (!kinds.storage_box) blocked.push('stash_loot (no storage box yet)');
+  if (invCount(inv, 'berry') >= 14) blocked.push('stock_berries (already stocked)');
+  if (pets > 0) blocked.push('tame_dodo (already have a pet)');
+  if (tools.includes('stone_axe') || tools.includes('metal_axe')) blocked.push('craft_axe (done)');
+  if (tools.includes('stone_pick') || tools.includes('metal_pick')) blocked.push('craft_pick (done)');
+  if (tools.includes('spear') || tools.includes('sword')) blocked.push('craft_spear (done)');
+  if (kinds.campfire) blocked.push('build_campfire (done)');
+  if (hutPieces >= 6) blocked.push('build_hut (done)');
+  if (kinds.storage_box) blocked.push('build_storage (done)');
+  if (kinds.forge) blocked.push('build_forge (done)');
 
   return `Survivor ${bot.name}: hp ${Math.round(bot.hp)}/100, food ${Math.round(bot.hunger)}, water ${Math.round(bot.thirst)}. Time: ${phase < 0.66 ? 'day' : 'night'}.\n`
     + `Tools: ${tools.join(', ') || 'none'}. Metal armor worn: ${armorN}/4 pieces.\n`
     + `Inventory: ${counts}.\n`
-    + `Camp: campfire ${kinds.campfire ? 'yes' : 'no'}, hut ${hutPieces}/5 pieces, storage box ${kinds.storage_box ? 'yes' : 'no'}, forge ${kinds.forge ? 'yes' : 'no'}.\n`
+    + `Camp: campfire ${kinds.campfire ? 'yes' : 'no'}, hut ${hutPieces}/6 pieces, storage box ${kinds.storage_box ? 'yes' : 'no'}, forge ${kinds.forge ? 'yes' : 'no'}.\n`
     + `Pets: ${pets}. Own a bronto: ${bronto ? 'yes' : 'no'}. Frontier squads out: ${botsOut}/4.\n`
-    + (blocked.length ? `Unavailable right now, do NOT pick: ${blocked.join('; ')}.\n` : '')
+    + (blocked.length ? `Done or unavailable, do NOT pick: ${blocked.join('; ')}.\n` : '')
     + 'Pick the next goal.';
 }
 
@@ -161,6 +173,7 @@ async function requestPlan(bot) {
     // a plan for the mainland brain would be nonsense there. Drop it.
     if (!world.players.has(bot.id) || bot.x + PLAYER_W / 2 >= EXP_BASE) return;
     bot.ai.llmPlan = { goal: plan.goal, at: nowS() };
+    if (plan.goal !== bot.ai.llmLastDone) bot.ai.llmLastDone = null; // a fresh pick resets the churn strike
     failStreak = 0;
     console.log(`llm: ${bot.name} -> ${plan.goal}`);
     if (plan.say && !(bot.ai.llmSayCd > nowS())) {
@@ -200,8 +213,16 @@ export function llmGoal(bot) {
 }
 
 // The plan's wish is fulfilled (or can't be acted on here): clear it and pull
-// the next ask forward so the bot doesn't idle out the rest of the period.
+// the next ask forward so the bot doesn't idle out the rest of the period —
+// unless the model just re-picked the goal we already declared finished, in
+// which case asking again immediately would loop; sit out a full period.
 export function llmPlanDone(bot) {
+  const goal = bot.ai.llmPlan?.goal;
   bot.ai.llmPlan = null;
+  if (goal && bot.ai.llmLastDone === goal) {
+    bot.ai.llmNextAt = nowS() + PLAN_S + Math.random() * PLAN_JITTER_S;
+    return;
+  }
+  if (goal) bot.ai.llmLastDone = goal;
   bot.ai.llmNextAt = Math.min(bot.ai.llmNextAt ?? Infinity, nowS() + 2 + Math.random() * 2);
 }
