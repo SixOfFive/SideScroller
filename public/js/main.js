@@ -13,7 +13,7 @@ import {
   openStorage, closeAllPanels, toggleOptions, isPanelOpen,
 } from './ui.js';
 import { initChat, focusChat } from './chat.js';
-import { initSound, toggleMute, sfx } from './sound.js';
+import { initSound, toggleMute, sfx, soundTick } from './sound.js';
 import { slotItem } from './slots.js';
 import { HARVEST_RANGE, INTERACT_RANGE, PLAYER_W, PLAYER_H, BUILD_REACH } from '/shared/const.js';
 import { STRUCTURES } from '/shared/structures.js';
@@ -237,6 +237,8 @@ window.__game = {
   pump(n = 3) {
     for (let i = 0; i < n; i++) {
       if (state.me.mounted) rideAlong(); else stepLocal(state.me, 1 / 60, held);
+      soundTick(); // keep headless frames honest — same order as frame()
+      processActions();
       render(1 / 60);
     }
   },
@@ -269,6 +271,7 @@ function frame(now) {
   if (state.joined) {
     if (state.me.mounted) rideAlong();
     else stepLocal(state.me, dt, held);
+    soundTick();
     processActions();
     updateHover();
     render(dt);
