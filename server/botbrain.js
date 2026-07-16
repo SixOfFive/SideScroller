@@ -19,6 +19,7 @@ import {
 } from '../shared/regions.js';
 import { invCount, invHas } from './inventory.js';
 import { broadcast } from './net.js';
+import { llmPlanTick, llmGoal, llmPlanDone } from './llmbrain.js';
 
 export const THINK_S = 0.5;
 
@@ -145,8 +146,9 @@ function keepFor(bot, item) {
   return Math.max(KEEP[item] ?? KEEP_DEFAULT, bot.ai.goalCost?.[item] || 0);
 }
 
-// Haul surplus home. Returns true while the chore has the turn.
-function stashStep(bot) {
+// Haul surplus home. Returns true while the chore has the turn. `force`
+// (an LLM stash_loot plan) makes even a small surplus worth the trip.
+function stashStep(bot, force = false) {
   const box = ownedOfKind(bot, 'storage_box')[0];
   if (!box || !box.inv) { bot.ai.stash = false; return false; }
   const over = [];
@@ -158,7 +160,7 @@ function stashStep(bot) {
     excess += qty - keep;
   }
   if (!over.length) { bot.ai.stash = false; return false; }
-  if (!bot.ai.stash && excess < 15) return false; // not worth a trip yet
+  if (!bot.ai.stash && !force && excess < 15) return false; // not worth a trip yet
   bot.ai.stash = true;
   const bx = box.x + STRUCTURES.storage_box.w / 2;
   if (goto(bot, bx, INTERACT_RANGE + 40)) {
@@ -364,6 +366,30 @@ const GOALS = [
     step: (b) => craftStep(b, 'sword') },
 ];
 
+// --- LLM plan execution ----------------------------------------------------------
+// Maps each llmbrain.js goal name onto existing ladder entries (worked in
+// order) or a special behavior. `can` gates plans whose executor would just
+// stand there (e.g. smelting with no forge) — a failed gate re-plans instead.
+
+const byId = Object.fromEntries(GOALS.map((g) => [g.id, g]));
+const LLM_EXEC = {
+  craft_axe:         { seq: [byId.axe] },
+  craft_pick:        { seq: [byId.pick] },
+  craft_spear:       { seq: [byId.spear] },
+  build_campfire:    { seq: [byId.campfire] },
+  build_hut:         { seq: [byId.fndA, byId.fndB, byId.wall, byId.door, byId.roofs] },
+  build_storage:     { seq: [byId.box] },
+  build_forge:       { seq: [byId.forge] },
+  stock_meat:        { seq: [byId.meat], can: (b) => countOwned(b, 'campfire') >= 1 },
+  stock_berries:     { seq: [byId.berries] },
+  tame_dodo:         { seq: [byId.tame] },
+  craft_metal_tools: { seq: [byId.mpick, byId.maxe, byId.sword], can: (b) => countOwned(b, 'forge') >= 1 },
+  stash_loot:        { special: 'stash' },
+  go_expedition:     { special: 'embark',
+    can: (b) => haveTool(b, 'sword') && !(b.ai.expCooldown > 0) && expeditionBotCount() < EXP_BOT_CAP },
+  rest:              { special: 'rest' },
+};
+
 // --- survival interrupts -----------------------------------------------------------
 
 // Drink/eat before working. Returns true if the need took the turn.
@@ -451,6 +477,7 @@ const BUCKET = {
   door: 'build', roofs: 'build', box: 'build',
   meat: 'hunt', tame: 'hunt',
   forge: 'metal', mpick: 'metal', maxe: 'metal', sword: 'metal',
+  stash_loot: 'gather', go_expedition: 'metal', // LLM specials
 };
 
 function chatTick(bot) {
@@ -507,12 +534,13 @@ function myBrontoOf(bot) {
 
 // Decide whether an idle, ladder-complete bot gears up and commits to a run.
 // Returns true if it took this turn (prepping counts). Explorer disposition is
-// rolled once per bot; only some are the adventuring type.
-function maybeEmbark(bot) {
+// rolled once per bot; only some are the adventuring type — unless the LLM
+// planner `force`s the call, in which case the model IS the disposition.
+function maybeEmbark(bot, force = false) {
   const ai = bot.ai;
-  if (ai.expCooldown > 0) { ai.expCooldown -= THINK_S; return false; }
+  if (ai.expCooldown > 0) return false;
   if (ai.explorer === undefined) ai.explorer = Math.random() < 0.55;
-  if (!ai.explorer || !haveTool(bot, 'sword')) return false;
+  if ((!ai.explorer && !force) || !haveTool(bot, 'sword')) return false;
   if (expeditionBotCount() >= EXP_BOT_CAP) return false;
 
   // Gear up: a FULL metal set (0.78 reduction) — anything less and a bronto's
@@ -621,6 +649,9 @@ function thinkCore(bot) {
 
   // Mid-dash through a camped border: keep running, ignore the fear.
   if (ai.dashT > 0) ai.dashT -= THINK_S;
+  // Post-expedition rest ticks down here (not inside maybeEmbark) so it also
+  // expires for LLM-driven bots, which only call maybeEmbark when told to go.
+  if (ai.expCooldown > 0) ai.expCooldown -= THINK_S;
 
   // 1. danger: flee what would kill us, fight what won't
   const threat = ai.dashT > 0 ? null : dangerNear(bot);
@@ -666,15 +697,39 @@ function thinkCore(bot) {
     ai.exped = false; // no gateway (shouldn't happen) — abort the ambition
   }
 
-  // 3. pick the goal first so the stash chore knows what NOT to deposit
-  const goal = GOALS.find((g) => !g.done(bot));
-  ai.goalId = goal ? goal.id : 'idle';
+  // 3. pick the goal first so the stash chore knows what NOT to deposit.
+  //    With LLM brains on, the model's plan outranks the ladder order; the
+  //    ladder stays as the fallback (no plan yet, plan finished, endpoint down).
+  let goal = null, planned = null;
+  if (world.settings.llmBots) {
+    llmPlanTick(bot); // fire an async re-plan when due — never blocks the tick
+    const name = llmGoal(bot);
+    const entry = name && LLM_EXEC[name];
+    if (entry && (!entry.can || entry.can(bot))) {
+      if (entry.seq) {
+        goal = entry.seq.find((g) => !g.done(bot)) || null;
+        if (goal) planned = name;
+        else llmPlanDone(bot); // wish already granted — ask again soon
+      } else {
+        planned = name; // special — handled in step 4
+      }
+    } else if (name) {
+      llmPlanDone(bot); // unknown goal or unmet requirement — re-plan
+    }
+  }
+  if (!goal && !planned) goal = GOALS.find((g) => !g.done(bot)) || null;
+  ai.goalId = goal ? goal.id : (planned || 'idle');
   ai.goalCost = goal && goal.recipe ? RECIPES[goal.recipe].cost : null;
 
   // 4. haul surplus home to the storage box (loot for daring visitors),
-  //    otherwise work the ladder / idle patrol
-  if (!stashStep(bot)) {
+  //    otherwise work the plan / ladder / idle patrol
+  if (planned === 'go_expedition') {
+    if (!maybeEmbark(bot, true)) llmPlanDone(bot); // cap filled meanwhile — re-plan
+  } else if (planned === 'stash_loot') {
+    if (!stashStep(bot, true)) { llmPlanDone(bot); wanderNear(bot, ai.home); }
+  } else if (!stashStep(bot)) {
     if (goal) goal.step(bot);
+    else if (planned === 'rest' || world.settings.llmBots) wanderNear(bot, ai.home);
     else if (!maybeEmbark(bot)) wanderNear(bot, ai.home); // ladder done: eye the frontier
   }
 

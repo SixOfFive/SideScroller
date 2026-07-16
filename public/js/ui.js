@@ -416,6 +416,8 @@ function refreshOptions() {
   bsel.onchange = () => sendMsg({ t: 'setSettings', bots: Number(bsel.value) });
   botRow.append(bsel, el('span', 'cost', 'computer survivors that build and roam (up to 15)'));
   panel.append(botRow);
+  panel.append(settingRow('LLM bot brains', 'llmBots',
+    'on = a local LLM picks each AI survivor\'s next goal (needs the LAN model server; off = built-in logic)'));
 
   panel.append(el('h3', '', 'Local'));
   const muteRow = el('div', 'itemrow');

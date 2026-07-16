@@ -26,7 +26,7 @@ export const state = {
     mounted: false, mountId: null,
     hurtT: 0, shake: 0,     // damage flash + screen-shake timers
   },
-  settings: { hunger: true, thirst: true, damage: true, instantTame: false, dayLen: 480, bots: 3 },
+  settings: { hunger: true, thirst: true, damage: true, instantTame: false, llmBots: false, dayLen: 480, bots: 3 },
   build: null,            // active build kind while in build mode
   hoverNode: null,
 };

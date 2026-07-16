@@ -111,7 +111,7 @@ const HANDLERS = {
   setSettings(p, m) {
     const s = world.settings;
     let changed = false;
-    for (const k of ['hunger', 'thirst', 'damage', 'instantTame']) {
+    for (const k of ['hunger', 'thirst', 'damage', 'instantTame', 'llmBots']) {
       if (typeof m[k] === 'boolean' && s[k] !== m[k]) { s[k] = m[k]; changed = true; }
     }
     // AI survivor count (0..15 — matches MAX_BOTS in bots.js; that module applies the change).
