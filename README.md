@@ -16,7 +16,17 @@ and the survival HUD. All art and sound are generated at runtime — no asset fi
 **Windows:** double-click **`start-server.bat`**. On first run it installs
 dependencies automatically, then launches the server and prints the URLs.
 
-**Any platform (or from a terminal):**
+**Linux / macOS:** run **`./start-server.sh`**. Same deal — it checks Node,
+installs the one dependency if it is missing, then launches. It does not need
+npm: where npm is absent (Debian's `nodejs` package ships without it) it uses
+corepack, and failing that installs straight from `package-lock.json`,
+verifying each tarball's checksum. `./start-server.sh --help` lists the
+options (`--port`, `--data`, the LLM endpoint overrides).
+
+There is no Python anywhere in this project, so there is no virtualenv to set
+up — the only requirement is Node.js 18+ and the `ws` package.
+
+**Any platform, by hand:**
 
 ```
 npm install
