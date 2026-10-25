@@ -2,6 +2,19 @@
 
 All notable changes to SideScroller. Newest first.
 
+## 2026-10-25
+
+### Changed
+- **LLM bot brains now default to UltimateController (uC) at
+  `http://192.168.15.3:11434/v1/chat/completions`** (`server/llmbrain.js`, `LLM_URL`).
+  The old default was Golden Eye `192.168.15.3:21345`. The model is still `qwen3:4b`.
+  - Why: Golden Eye is retired. uC routes by model name, so the old "different port for the
+    14B" option is gone, and uC has no `qwen2.5:14b-instruct`. The header comment now
+    names `qwen3.8-flash-next-iq3_s` as the smarter option, selected with `SS_LLM_MODEL`.
+  - Verified: `node --check`, plus a real request using the module's own `LLM_URL` and
+    `LLM_MODEL`. It returned HTTP 200 and a parseable `{"goal": ...}` plan.
+  - Undo: `git revert` the commit, or set `SS_LLM_URL`.
+
 ## 2026-08-13
 
 ### Added

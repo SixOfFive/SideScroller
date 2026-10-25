@@ -5,11 +5,14 @@
 // (endpoint down, timeout, bad JSON, unknown goal) simply leaves the heuristic
 // ladder driving until a plan lands.
 //
-// Endpoints: LAN OpenAI-compatible servers. Two are available:
-//   http://192.168.15.3:21345  qwen3:4b             (~1.4s/plan — the default)
-//   http://192.168.15.3:21351  qwen2.5:14b-instruct (~2.6s/plan — smarter, slower)
+// Endpoint: UltimateController (uC), the LAN OpenAI-compatible server at
+// http://192.168.15.3:11434. It routes by MODEL NAME (one port for all models),
+// replacing the retired Golden Eye ports (:21345 qwen3:4b, :21351 14B) on
+// 2026-10-25. Models:
+//   qwen3:4b                  (the default; small and fast)
+//   qwen3.8-flash-next-iq3_s  (smarter; uC has no qwen2.5:14b-instruct any more)
 // The 4B keeps up with 15 bots re-planning every ~15s through one serialized
-// request slot; swap via env SS_LLM_URL / SS_LLM_MODEL to try the 14B.
+// request slot; swap via env SS_LLM_MODEL (or SS_LLM_URL) to try another.
 
 import { world } from './state.js';
 import { DINODEFS } from '../shared/dinodefs.js';
@@ -18,7 +21,7 @@ import { EXP_BASE } from '../shared/regions.js';
 import { invCount } from './inventory.js';
 import { broadcast } from './net.js';
 
-export const LLM_URL = process.env.SS_LLM_URL || 'http://192.168.15.3:21345/v1/chat/completions';
+export const LLM_URL = process.env.SS_LLM_URL || 'http://192.168.15.3:11434/v1/chat/completions';
 export const LLM_MODEL = process.env.SS_LLM_MODEL || 'qwen3:4b';
 
 // The goal vocabulary the LLM chooses from. botbrain.js maps each name onto
